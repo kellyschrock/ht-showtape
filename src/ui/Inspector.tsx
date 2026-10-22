@@ -5,14 +5,16 @@ import { formatSeconds, parseSeconds } from '../show/timecode'
 import { EASES, useSelectedChannel, useShow } from '../stores/show'
 import { useTransport } from '../stores/transport'
 import { Field, NumberField, Section } from './fields'
+import { MonitorPanel } from './MonitorPanel'
 import { ServosPanel } from './ServosPanel'
 
-export type InspectorTab = 'selection' | 'show' | 'servos'
+export type InspectorTab = 'selection' | 'show' | 'servos' | 'monitor'
 
 const TABS: ReadonlyArray<{ id: InspectorTab; label: string }> = [
   { id: 'selection', label: 'Channel' },
   { id: 'show', label: 'Show' },
   { id: 'servos', label: 'Servos' },
+  { id: 'monitor', label: 'Monitor' },
 ]
 
 export function Inspector({ tab, onTab }: { tab: InspectorTab; onTab(tab: InspectorTab): void }) {
@@ -43,7 +45,15 @@ export function Inspector({ tab, onTab }: { tab: InspectorTab; onTab(tab: Inspec
             </button>
           </div>
         ) : null}
-        {tab === 'selection' ? <SelectionPanel /> : tab === 'show' ? <ShowPanel /> : <ServosPanel />}
+        {tab === 'selection' ? (
+          <SelectionPanel />
+        ) : tab === 'show' ? (
+          <ShowPanel />
+        ) : tab === 'servos' ? (
+          <ServosPanel />
+        ) : (
+          <MonitorPanel />
+        )}
       </div>
     </aside>
   )

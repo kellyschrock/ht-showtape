@@ -50,6 +50,9 @@ npm run dev                           # browser only, at the printed URL
 - A red band marks a move faster than the channel's **Max speed**, and a
   dashed line shows where the servo really goes there, since output never
   exceeds that speed. Select a key to see the speed into and out of it.
+- The **Monitor** tab shows a simulated servo per channel, its horn
+  turning as the show plays or scrubs. It runs the same limits, speed
+  limit, mute and solo as live output, so no adapter is needed to watch.
 - **Duplicate channel** in the Inspector, or **Ctrl+D**, copies the
   selected channel with its keys and limits. The copy goes on the next
   free servo and node IDs, so retarget it before playing.

@@ -598,3 +598,89 @@
   color: var(--ht-bad);
   font-weight: 600;
 }
+
+/* --------------------------------------------------------------------------
+   Monitor: simulated servos
+   -------------------------------------------------------------------------- */
+
+.st-monitor {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.st-dial {
+  margin: 0;
+  padding: 8px 8px 10px;
+  border: 1px solid var(--ht-line);
+  border-radius: 8px;
+  background: var(--st-lane-bg);
+}
+.st-dial svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.st-dial__case {
+  fill: color-mix(in srgb, var(--ht-ink) 10%, transparent);
+  stroke: color-mix(in srgb, var(--ht-ink) 22%, transparent);
+}
+.st-dial__track {
+  fill: none;
+  stroke: var(--st-grid-major);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.st-dial__range {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+.st-dial__rest {
+  stroke: var(--ht-ink-3);
+  stroke-width: 2;
+}
+.st-dial__horn {
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.st-dial__ghost {
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+.st-dial__hub {
+  fill: var(--ht-ink-2);
+  stroke: var(--st-lane-bg);
+  stroke-width: 2;
+}
+.st-dial figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: var(--ht-size-xs);
+}
+.st-dial__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ht-ink);
+  font-weight: 600;
+}
+.st-dial__value {
+  flex: none;
+  color: var(--ht-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.st-dial--lag {
+  border-color: color-mix(in srgb, var(--ht-bad) 60%, transparent);
+}
+.st-dial--lag .st-dial__value {
+  color: var(--ht-bad);
+  font-weight: 600;
+}
+.st-dial--held {
+  opacity: 0.5;
+}

@@ -44,6 +44,11 @@ export const MIN_ZOOM = 10
 export const MAX_ZOOM = 1000
 
 const clock: Clock = new InternalClock()
+
+/** Where the show is right now, read from the clock as output does, not from the last frame's playhead. */
+export function showTime(): number {
+  return clock.now()
+}
 let output: ServoOutput | null = null
 let frame = 0
 let statsTimer: ReturnType<typeof setInterval> | null = null
