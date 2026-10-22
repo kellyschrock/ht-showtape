@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clamp, sampleChannel, sampleKeys, servoDegrees, slew } from './sample'
+import { clamp, followChannel, sampleChannel, sampleKeys, segmentSpeed, servoDegrees, slew, tooFastSegments } from './sample'
 import { newChannel, type Keyframe } from './model'
 
 const k = (t: number, v: number, ease: Keyframe['ease'] = 'linear'): Keyframe => ({ id: `${t}`, t, v, ease })
@@ -59,5 +59,31 @@ describe('limits', () => {
     expect(slew(0, -100, 90, 100)).toBeCloseTo(-9)
     expect(slew(0, 5, 90, 100)).toBe(5)
     expect(slew(0, 100, 0, 100)).toBe(100)
+  })
+})
+
+describe('speed', () => {
+  const key = (t: number, v: number, ease: Keyframe['ease'] = 'smooth'): Keyframe => ({ id: `k${t}`, t, v, ease })
+
+  it('gives a segment its peak speed: 1.5x the average when smooth', () => {
+    expect(segmentSpeed(key(0, 0, 'linear'), key(1000, 90))).toBe(90)
+    expect(segmentSpeed(key(0, 0, 'smooth'), key(1000, 90))).toBe(135)
+    expect(segmentSpeed(key(0, 0, 'step'), key(1000, 90))).toBe(0)
+    expect(segmentSpeed(key(500, 0, 'linear'), key(500, 10))).toBe(Infinity)
+  })
+
+  it('flags segments faster than the limit, and none with no limit', () => {
+    const channel = { ...newChannel(0), maxSpeed: 180, keys: [key(0, 0), key(1000, 60), key(1300, -60), key(2000, -60)] }
+    expect([...tooFastSegments(channel).keys()]).toEqual([1])
+    expect(tooFastSegments({ ...channel, maxSpeed: 0 }).size).toBe(0)
+  })
+
+  it('follows the curve where it can, and lags where it is too fast', () => {
+    const channel = { ...newChannel(0), maxSpeed: 100, keys: [key(0, 0, 'linear'), key(1000, 50, 'linear'), key(1100, -50, 'linear')] }
+    const path = followChannel(channel, 2000, 20)
+    expect(path[25]).toBeCloseTo(sampleChannel(channel, 500))
+    // 100 deg in 100 ms asks for 1000 deg/s; at 100 deg/s it takes a second.
+    expect(path[55]!).toBeGreaterThan(sampleChannel(channel, 1100) + 40)
+    expect(path[100]).toBeCloseTo(-50)
   })
 })

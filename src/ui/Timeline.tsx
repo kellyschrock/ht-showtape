@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -9,7 +10,7 @@ import {
 } from 'react'
 import { protocolLabel } from '@ht/protocol'
 import { effectiveProtocol, sortKeys, type Channel, type Keyframe, type Show } from '../show/model'
-import { clamp, roundDegrees, sampleChannel } from '../show/sample'
+import { clamp, followChannel, roundDegrees, sampleChannel, tooFastSegments } from '../show/sample'
 import { snap as snapTo, snapStep } from '../show/timecode'
 import { mapChannel, useShow } from '../stores/show'
 import { useTransport } from '../stores/transport'
@@ -201,19 +202,44 @@ function curvePath(channel: Channel, width: number, x: (t: number) => number, y:
   const first = keys[0]
   if (!first) return `M0,${y(channel.rest)}H${width}`
   let d = `M0,${y(first.v)}H${x(first.t)}`
-  for (let i = 0; i < keys.length - 1; i++) {
-    const a = keys[i]!
-    const b = keys[i + 1]!
-    const xa = x(a.t)
-    const xb = x(b.t)
-    if (a.ease === 'step') d += `H${xb}V${y(b.v)}`
-    else if (a.ease === 'linear') d += `L${xb},${y(b.v)}`
-    else {
-      const dx = (xb - xa) / 3
-      d += `C${xa + dx},${y(a.v)} ${xb - dx},${y(b.v)} ${xb},${y(b.v)}`
+  for (let i = 0; i < keys.length - 1; i++) d += segmentPath(keys[i]!, keys[i + 1]!, x, y)
+  return `${d}H${width}`
+}
+
+/** One segment of the curve, drawn on from its first key. */
+function segmentPath(a: Keyframe, b: Keyframe, x: (t: number) => number, y: (v: number) => number): string {
+  const xa = x(a.t)
+  const xb = x(b.t)
+  if (a.ease === 'step') return `H${xb}V${y(b.v)}`
+  if (a.ease === 'linear') return `L${xb},${y(b.v)}`
+  const dx = (xb - xa) / 3
+  return `C${xa + dx},${y(a.v)} ${xb - dx},${y(b.v)} ${xb},${y(b.v)}`
+}
+
+/** Below this many degrees off the curve, the servo counts as keeping up. */
+const LAG_DEG = 0.5
+
+/**
+ * Where the servo falls behind the curve, as a path of only those stretches.
+ * Everywhere else it is on the curve, and a second line there is noise.
+ */
+function lagPath(channel: Channel, follow: readonly number[], stepMs: number, x: (t: number) => number, y: (v: number) => number): string {
+  let d = ''
+  let open = false
+  for (let i = 0; i < follow.length; i++) {
+    const t = i * stepMs
+    const lagging = Math.abs(follow[i]! - sampleChannel(channel, t)) > LAG_DEG
+    if (lagging) {
+      // Start a step early, from where it was still on the curve, so the line leaves the curve.
+      if (!open) d += i > 0 ? `M${x(t - stepMs)},${y(follow[i - 1]!)}` : `M${x(t)},${y(follow[i]!)}`
+      d += `L${x(t)},${y(follow[i]!)}`
+      open = true
+    } else if (open) {
+      d += `L${x(t)},${y(follow[i]!)}`
+      open = false
     }
   }
-  return `${d}H${width}`
+  return d
 }
 
 interface Drag {
@@ -240,6 +266,10 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
   const step = snapStep(show.source.fps, show.source.bpm)
 
   const path = curvePath(channel, width, x, y)
+  const stepMs = 1000 / show.outputHz
+  const follow = useMemo(() => followChannel(channel, show.source.durationMs, stepMs), [channel, show.source.durationMs, stepMs])
+  const lag = lagPath(channel, follow, stepMs, x, y)
+  const fast = tooFastSegments(channel)
 
   function local(e: { clientX: number; clientY: number }): { px: number; py: number } {
     const rect = svg.current!.getBoundingClientRect()
@@ -323,7 +353,19 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
       onPointerCancel={onUp}
     >
       {zero != null ? <line className="st-lane__zero" x1={0} x2={width} y1={zero} y2={zero} /> : null}
+      {[...fast].map(([i, speed]) => {
+        const a = channel.keys[i]!
+        const b = channel.keys[i + 1]!
+        return (
+          <path key={a.id} className="st-lane__fast" d={`M${x(a.t)},${y(a.v)}${segmentPath(a, b, x, y)}`}>
+            <title>
+              {`Asks for ${Number.isFinite(speed) ? Math.round(speed) : '∞'}°/s; the limit is ${channel.maxSpeed}°/s, so the servo lags here`}
+            </title>
+          </path>
+        )
+      })}
       <path className="st-lane__curve" d={path} style={{ stroke: channel.color }} />
+      {lag ? <path className="st-lane__follow" d={lag} style={{ stroke: channel.color }} /> : null}
       {channel.keys.map((k) => {
         const on = selected.includes(k.id)
         const cx = x(k.t)

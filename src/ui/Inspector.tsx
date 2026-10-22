@@ -1,5 +1,6 @@
 import { PROTOCOLS, SPEEDS, protocolLabel, type Protocol } from '@ht/protocol'
 import { SOURCES, type Channel, type ChannelProtocol, type FrameRate } from '../show/model'
+import { segmentSpeed, tooFastSegments } from '../show/sample'
 import { formatSeconds, parseSeconds } from '../show/timecode'
 import { EASES, useSelectedChannel, useShow } from '../stores/show'
 import { useTransport } from '../stores/transport'
@@ -104,6 +105,7 @@ function KeysSection({ channel }: { channel: Channel }) {
                   onChange={(v) => updateKeys(channel.id, [one.id], { v })}
                 />
               </Field>
+              <KeySpeed channel={channel} keyId={one.id} />
             </>
           ) : null}
           <Field label="Into next" hint="How the curve leaves this key toward the next one">
@@ -128,6 +130,32 @@ function KeysSection({ channel }: { channel: Channel }) {
         </>
       )}
     </Section>
+  )
+}
+
+function speedText(speed: number): string {
+  return Number.isFinite(speed) ? `${Math.round(speed)}°/s` : 'instant'
+}
+
+/** How fast the curve moves into and out of a key, against the channel's limit. */
+function KeySpeed({ channel, keyId }: { channel: Channel; keyId: string }) {
+  const i = channel.keys.findIndex((k) => k.id === keyId)
+  const prev = channel.keys[i - 1]
+  const key = channel.keys[i]!
+  const next = channel.keys[i + 1]
+  const into = prev ? segmentSpeed(prev, key) : null
+  const out = next ? segmentSpeed(key, next) : null
+  if (into == null && out == null) return null
+  const limit = channel.maxSpeed
+  const over = (s: number | null) => s != null && limit > 0 && s > limit
+  return (
+    <Field label="Speed" hint="The fastest the curve moves on each side of this key. Above the channel's max speed, the servo lags the curve.">
+      <span className="st-speeds">
+        {into != null ? <span className={over(into) ? 'st-speed--over' : ''}>in {speedText(into)}</span> : null}
+        {out != null ? <span className={over(out) ? 'st-speed--over' : ''}>out {speedText(out)}</span> : null}
+        {over(into) || over(out) ? <span className="st-speed--over">limit {limit}°/s</span> : null}
+      </span>
+    </Field>
   )
 }
 
@@ -214,6 +242,7 @@ function ChannelSection({ channel }: { channel: Channel }) {
         <Field label="Max speed" hint="The output never moves faster than this, whatever the keys say. 0 is unlimited.">
           <NumberField value={channel.maxSpeed} min={0} max={2000} step={10} suffix="°/s" onChange={(v) => set({ maxSpeed: v }, 'maxSpeed')} />
         </Field>
+        <SpeedSummary channel={channel} />
         <Field label="Trim" hint="Added at the servo, after the limits, to centre a mechanism without moving every key">
           <NumberField value={channel.trim} min={-90} max={90} step={0.5} suffix="°" onChange={(v) => set({ trim: v }, 'trim')} />
         </Field>
@@ -240,6 +269,20 @@ function ChannelSection({ channel }: { channel: Channel }) {
         </button>
       </div>
     </>
+  )
+}
+
+/** Which moves the speed limit slows, and what limit would let them all through. */
+function SpeedSummary({ channel }: { channel: Channel }) {
+  const fast = [...tooFastSegments(channel).values()]
+  if (fast.length === 0) return null
+  const worst = Math.max(...fast)
+  return (
+    <p className="ht-hint ht-hint--error">
+      {fast.length === 1 ? '1 move is' : `${fast.length} moves are`} faster than this, so the servo lags the curve
+      there (marked in red).{' '}
+      {Number.isFinite(worst) ? `Following every key exactly needs ${Math.ceil(worst / 10) * 10}°/s.` : 'Two keys share a time with different values.'}
+    </p>
   )
 }
 

@@ -71,3 +71,45 @@ export function slew(from: number, to: number, maxSpeed: number, dtMs: number): 
   const d = to - from
   return Math.abs(d) <= step ? to : from + Math.sign(d) * step
 }
+
+/**
+ * The fastest a segment asks its servo to move, in degrees per second.
+ * Smoothstep peaks halfway at 1.5 times the average speed. A hold asks for
+ * nothing until it jumps at the next key, and that jump is meant to go as
+ * fast as the limit lets it, so it counts as 0 here.
+ */
+export function segmentSpeed(a: Keyframe, b: Keyframe): number {
+  if (a.ease === 'step') return 0
+  const dv = Math.abs(b.v - a.v)
+  if (dv === 0) return 0
+  const dt = b.t - a.t
+  if (dt <= 0) return Infinity
+  return ((a.ease === 'smooth' ? 1.5 : 1) * dv * 1000) / dt
+}
+
+/** Segments asking for more than the channel's speed limit, by the index of the key they start at. */
+export function tooFastSegments(channel: Channel): Map<number, number> {
+  const out = new Map<number, number>()
+  if (channel.maxSpeed <= 0) return out
+  for (let i = 0; i < channel.keys.length - 1; i++) {
+    const speed = segmentSpeed(channel.keys[i]!, channel.keys[i + 1]!)
+    if (speed > channel.maxSpeed) out.set(i, speed)
+  }
+  return out
+}
+
+/**
+ * Where the servo actually goes, playing from the start: the curve with the
+ * speed limit applied, stepped as playback sends it. Value `i` is the
+ * position at `i * stepMs`. Assumes the servo starts on the curve, as it
+ * does once output has eased it there.
+ */
+export function followChannel(channel: Channel, durationMs: number, stepMs: number): number[] {
+  const out: number[] = []
+  let v = sampleChannel(channel, 0)
+  for (let t = 0; t <= durationMs; t += stepMs) {
+    v = slew(v, sampleChannel(channel, t), channel.maxSpeed, stepMs)
+    out.push(v)
+  }
+  return out
+}

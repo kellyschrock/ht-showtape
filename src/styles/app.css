@@ -389,6 +389,23 @@
   stroke-linejoin: round;
   pointer-events: none;
 }
+/* A segment faster than the channel's speed limit: a band behind the curve. */
+.st-lane__fast {
+  fill: none;
+  stroke: color-mix(in srgb, var(--ht-bad) 45%, transparent);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Where the servo actually goes while it lags the curve. */
+.st-lane__follow {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  stroke-linejoin: round;
+  opacity: 0.85;
+  pointer-events: none;
+}
 .st-key {
   cursor: grab;
 }
@@ -565,5 +582,19 @@
   background: var(--ht-surface-2);
 }
 .st-servolist__title {
+  font-weight: 600;
+}
+
+/* Key speeds in the inspector, red when over the channel's limit. */
+.st-speeds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--ht-size-xs);
+  color: var(--ht-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.st-speed--over {
+  color: var(--ht-bad);
   font-weight: 600;
 }
