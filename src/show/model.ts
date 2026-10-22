@@ -118,6 +118,36 @@ export function newChannel(index: number, servo: Partial<Channel['servo']> = {})
   }
 }
 
+/**
+ * A copy of a channel, keys and limits included, to sit beside the original.
+ *
+ * Everything gets fresh ids. The copy moves to the next servo and node IDs
+ * no other channel uses, so it never drives the same servo as the original
+ * until someone points it there on purpose.
+ */
+export function duplicateChannel(show: Show, id: string): Channel | null {
+  const source = show.channels.find((c) => c.id === id)
+  if (!source) return null
+  const nextFree = (from: number, used: number[]): number => {
+    let n = from + 1
+    while (used.includes(n)) n++
+    return n
+  }
+  return {
+    ...source,
+    id: newId('c'),
+    name: `${source.name} copy`,
+    color: CHANNEL_COLORS[show.channels.length % CHANNEL_COLORS.length]!,
+    servo: {
+      ...source.servo,
+      servoId: nextFree(source.servo.servoId, show.channels.map((c) => c.servo.servoId)),
+      nodeId: nextFree(source.servo.nodeId, show.channels.map((c) => c.servo.nodeId)),
+    },
+    solo: false,
+    keys: source.keys.map((k) => ({ ...k, id: newId('k') })),
+  }
+}
+
 export function newShow(): Show {
   return {
     format: SHOW_FORMAT,

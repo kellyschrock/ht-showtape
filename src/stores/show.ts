@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import {
+  duplicateChannel,
   newChannel,
   newId,
   newShow,
@@ -49,6 +50,8 @@ interface ShowState {
 
   select(selection: Partial<Selection>): void
   addChannel(servo?: Partial<Channel['servo']>, name?: string): void
+  /** Copies a channel, keys and all, to just below it, and selects the copy. */
+  duplicateChannel(id: string): void
   removeChannel(id: string): void
   updateChannel(id: string, patch: Partial<Channel>, coalesce?: string): void
   addKey(channelId: string, t: number, v?: number): void
@@ -166,6 +169,15 @@ export const useShow = create<ShowState>((set, get) => {
       const channel = { ...newChannel(index, servo), ...(name ? { name } : {}) }
       get().edit((s) => ({ ...s, channels: [...s.channels, channel] }))
       set({ selection: { channelId: channel.id, keyIds: [] } })
+    },
+
+    duplicateChannel(id) {
+      const show = get().show
+      const copy = duplicateChannel(show, id)
+      if (!copy) return
+      const at = show.channels.findIndex((c) => c.id === id) + 1
+      get().edit((s) => ({ ...s, channels: [...s.channels.slice(0, at), copy, ...s.channels.slice(at)] }))
+      set({ selection: { channelId: copy.id, keyIds: [] } })
     },
 
     removeChannel(id) {

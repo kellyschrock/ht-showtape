@@ -48,6 +48,11 @@ export function useShortcuts(): void {
         show.selectAllKeys()
         return
       }
+      if (mod && key === 'd') {
+        e.preventDefault()
+        if (show.selection.channelId) show.duplicateChannel(show.selection.channelId)
+        return
+      }
       if (mod) return
 
       const { channelId, keyIds } = show.selection

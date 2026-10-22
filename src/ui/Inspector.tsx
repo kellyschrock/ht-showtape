@@ -225,6 +225,14 @@ function ChannelSection({ channel }: { channel: Channel }) {
       <div className="ht-row">
         <button
           type="button"
+          className="ht-btn ht-btn--sm ht-btn--secondary"
+          title="Ctrl+D. The copy goes on the next free servo ID."
+          onClick={() => useShow.getState().duplicateChannel(channel.id)}
+        >
+          Duplicate channel
+        </button>
+        <button
+          type="button"
           className="ht-btn ht-btn--sm ht-btn--danger"
           onClick={() => useShow.getState().removeChannel(channel.id)}
         >

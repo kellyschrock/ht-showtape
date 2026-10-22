@@ -42,6 +42,9 @@ npm run dev                           # browser only, at the printed URL
   keys nudge the selected keys, with Shift for bigger steps.
 - **Space** plays and pauses. **Home** and **End** jump to either end.
   **Ctrl+Z** undoes, and **Ctrl+S** saves.
+- **Duplicate channel** in the Inspector, or **Ctrl+D**, copies the
+  selected channel with its keys and limits. The copy goes on the next
+  free servo and node IDs, so retarget it before playing.
 - **Servos live** sends the show to the servos. It keeps sending while
   paused, so scrubbing or dragging a key moves the real figure.
 
