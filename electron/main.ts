@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { SerialLinkHost } from '../../ht-servo/electron/serial-link'
 
@@ -69,13 +69,48 @@ ipcMain.handle('link:write', (_event, id: number, bytes: Uint8Array) => links.wr
 ipcMain.handle('link:setSignals', (_event, id: number, signals) => links.setSignals(id, signals))
 ipcMain.handle('link:flushInput', (_event, id: number) => links.flushInput(id))
 
+// The folder the last show was opened from or saved to, so the dialogs
+// start there next time, across restarts. Without it, they start wherever
+// the platform likes, which on Linux is often ~/Downloads.
+const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json')
+
+async function lastShowDir(): Promise<string> {
+  try {
+    const settings = JSON.parse(await readFile(SETTINGS_FILE, 'utf8')) as { showDir?: unknown }
+    if (typeof settings.showDir === 'string') return settings.showDir
+  } catch {
+    // No settings yet, or unreadable: fall back below.
+  }
+  return app.getPath('documents')
+}
+
+async function rememberShowDir(file: string): Promise<void> {
+  try {
+    await mkdir(path.dirname(SETTINGS_FILE), { recursive: true })
+    await writeFile(
+      SETTINGS_FILE,
+      JSON.stringify({ showDir: path.dirname(file) }, null, 2) + '\n',
+      'utf8',
+    )
+  } catch (error) {
+    // Only a convenience; a failure here must not fail the open or save.
+    console.error(`Could not remember the show folder in ${SETTINGS_FILE}:`, error)
+  }
+}
+
 // Show files. The renderer never sees a path it did not get from a dialog.
 ipcMain.handle('show:open', async () => {
   if (!mainWindow) return null
-  const result = await dialog.showOpenDialog(mainWindow, { properties: ['openFile'], filters: SHOW_FILTERS })
+  const result = await dialog.showOpenDialog(mainWindow, {
+    defaultPath: await lastShowDir(),
+    properties: ['openFile'],
+    filters: SHOW_FILTERS,
+  })
   const file = result.filePaths[0]
   if (result.canceled || !file) return null
-  return { path: file, text: await readFile(file, 'utf8') }
+  const text = await readFile(file, 'utf8')
+  await rememberShowDir(file)
+  return { path: file, text }
 })
 
 ipcMain.handle('show:save', async (_event, request: { text: string; path: string | null; name: string }) => {
@@ -83,13 +118,14 @@ ipcMain.handle('show:save', async (_event, request: { text: string; path: string
   let file = request.path
   if (!file) {
     const result = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: `${request.name || 'Untitled'}.showtape.json`,
+      defaultPath: path.join(await lastShowDir(), `${request.name || 'Untitled'}.showtape.json`),
       filters: SHOW_FILTERS,
     })
     if (result.canceled || !result.filePath) return null
     file = result.filePath
   }
   await writeFile(file, request.text, 'utf8')
+  await rememberShowDir(file)
   return { path: file }
 })
 
