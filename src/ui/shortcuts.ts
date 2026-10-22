@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useShow } from '../stores/show'
 import { useTransport } from '../stores/transport'
 import { snapStep } from '../show/timecode'
+import { newFile, openFile } from './fileActions'
 
 /**
  * Editor keys, as a video or audio editor has them. Ignored while typing
@@ -28,7 +29,12 @@ export function useShortcuts(): void {
       }
       if (mod && key === 'o') {
         e.preventDefault()
-        void show.open()
+        void openFile()
+        return
+      }
+      if (mod && key === 'n') {
+        e.preventDefault()
+        void newFile()
         return
       }
       if (typing(e.target)) return

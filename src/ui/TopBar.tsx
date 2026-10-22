@@ -3,6 +3,7 @@ import { BRAND } from '@ht/brand'
 import { useConnection } from '@ht/stores/connection'
 import { SOURCES } from '../show/model'
 import { useShow } from '../stores/show'
+import { newFile, openFile } from './fileActions'
 
 const LINK_WORDS = {
   closed: ['Not connected', ''],
@@ -67,10 +68,10 @@ export function TopBar({ onOpenServos }: { onOpenServos(): void }) {
       </div>
 
       <div className="ht-appbar__band ht-appbar__band--right">
-        <button type="button" className="ht-btn ht-btn--ghost" onClick={() => useShow.getState().newShow()}>
+        <button type="button" className="ht-btn ht-btn--ghost" title="Ctrl+N" onClick={() => void newFile()}>
           New
         </button>
-        <button type="button" className="ht-btn ht-btn--ghost" title="Ctrl+O" onClick={() => void useShow.getState().open()}>
+        <button type="button" className="ht-btn ht-btn--ghost" title="Ctrl+O" onClick={() => void openFile()}>
           Open
         </button>
         <button type="button" className="ht-btn ht-btn--ghost" title="Ctrl+S, Ctrl+Shift+S to save as" onClick={() => void useShow.getState().save()}>

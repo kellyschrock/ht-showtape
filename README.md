@@ -44,7 +44,9 @@ npm run dev                           # browser only, at the printed URL
   playhead. Drag keys to move them. Shift-click selects several. The arrow
   keys nudge the selected keys, with Shift for bigger steps.
 - **Space** plays and pauses. **Home** and **End** jump to either end.
-  **Ctrl+Z** undoes, and **Ctrl+S** saves.
+  **Ctrl+Z** undoes, and **Ctrl+S** saves. **Ctrl+N** starts a new show and
+  **Ctrl+O** opens one; both ask first if there are unsaved changes, and
+  turn **Servos live** off.
 - **Duplicate channel** in the Inspector, or **Ctrl+D**, copies the
   selected channel with its keys and limits. The copy goes on the next
   free servo and node IDs, so retarget it before playing.

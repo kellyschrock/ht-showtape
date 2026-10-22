@@ -45,11 +45,51 @@ function createWindow(): void {
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   // A reload leaves the renderer with port ids it no longer knows about.
-  mainWindow.webContents.on('did-start-loading', () => void links.closeAll())
+  mainWindow.webContents.on('did-start-loading', () => {
+    // A reload starts a fresh show, which reports its own state.
+    showDirty = false
+    void links.closeAll()
+  })
   mainWindow.webContents.on('render-process-gone', () => void links.closeAll())
+  // Unsaved changes hold the window open until the user says what to do.
+  mainWindow.on('close', (event) => {
+    if (!showDirty || closing || !mainWindow) return
+    event.preventDefault()
+    void askSave(showName).then((choice) => {
+      if (choice === 'save') mainWindow?.webContents.send('show:save-and-close')
+      else if (choice === 'discard') closeWindow()
+    })
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+}
+
+// What the renderer last said about the open show, so closing can ask first.
+let showDirty = false
+let showName = ''
+/** Set once the user has agreed to close, so the close handler lets it through. */
+let closing = false
+
+function closeWindow(): void {
+  closing = true
+  mainWindow?.close()
+}
+
+type SaveChoice = 'save' | 'discard' | 'cancel'
+
+async function askSave(name: string): Promise<SaveChoice> {
+  if (!mainWindow) return 'discard'
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Unsaved changes',
+    message: `Save changes to “${name || 'Untitled show'}”?`,
+    detail: "Your changes are lost if you don't save them.",
+    buttons: ['Save', "Don't save", 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+  })
+  return (['save', 'discard', 'cancel'] as const)[response] ?? 'cancel'
 }
 
 // The channels ht-servo's preload calls. Its bridge is reused unchanged, so
@@ -192,6 +232,13 @@ ipcMain.handle(
     return { path: file }
   },
 )
+
+ipcMain.handle('show:ask-save', (_event, name: string) => askSave(String(name)))
+ipcMain.on('show:dirty', (_event, dirty: boolean, name: string) => {
+  showDirty = dirty === true
+  showName = String(name)
+})
+ipcMain.on('show:close', () => closeWindow())
 
 void app.whenReady().then(() => {
   createWindow()

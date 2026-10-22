@@ -62,7 +62,13 @@ interface ShowState {
   newShow(): void
   load(text: string, path: string | null): void
   save(saveAs?: boolean): Promise<void>
-  open(): Promise<void>
+  /** Picks a show file and loads it. False if nothing was loaded. */
+  open(): Promise<boolean>
+  /**
+   * Asks about unsaved changes before they would be thrown away: Save,
+   * Don't save, or Cancel. True when it is fine to go ahead.
+   */
+  confirmDiscard(): Promise<boolean>
   clearError(): void
 }
 
@@ -283,8 +289,22 @@ export const useShow = create<ShowState>((set, get) => {
     async open() {
       const bridge = window.showtape
       const picked = bridge ? await bridge.files.open() : await pickFileText()
-      if (!picked) return
+      if (!picked) return false
       get().load(picked.text, 'path' in picked ? picked.path : null)
+      return get().error == null
+    },
+
+    async confirmDiscard() {
+      const { dirty, show } = get()
+      if (!dirty) return true
+      const bridge = window.showtape
+      if (!bridge) return window.confirm(`Discard unsaved changes to “${show.name}”?`)
+      const choice = await bridge.files.askSave(show.name)
+      if (choice === 'cancel') return false
+      if (choice === 'discard') return true
+      await get().save()
+      // Cancelling the save dialog, or a failed write, leaves the show dirty.
+      return !get().dirty
     },
 
     async save(saveAs = false) {

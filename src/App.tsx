@@ -4,10 +4,12 @@ import { TransportBar } from './ui/TransportBar'
 import { Timeline } from './ui/Timeline'
 import { Inspector, type InspectorTab } from './ui/Inspector'
 import { useShortcuts } from './ui/shortcuts'
+import { useUnsavedGuard } from './ui/fileActions'
 
 export function App() {
   const [tab, setTab] = useState<InspectorTab>('selection')
   useShortcuts()
+  useUnsavedGuard()
 
   return (
     <div className="st-app">

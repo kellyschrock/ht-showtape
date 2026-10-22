@@ -12,5 +12,15 @@ contextBridge.exposeInMainWorld('showtape', {
   files: {
     open: () => ipcRenderer.invoke('show:open'),
     save: (request: { text: string; path: string | null; name: string }) => ipcRenderer.invoke('show:save', request),
+    askSave: (name: string) => ipcRenderer.invoke('show:ask-save', name),
+  },
+  window: {
+    setDirty: (dirty: boolean, name: string) => ipcRenderer.send('show:dirty', dirty, name),
+    onSaveAndClose: (fn: () => void) => {
+      const listener = () => fn()
+      ipcRenderer.on('show:save-and-close', listener)
+      return () => void ipcRenderer.removeListener('show:save-and-close', listener)
+    },
+    close: () => ipcRenderer.send('show:close'),
   },
 })
