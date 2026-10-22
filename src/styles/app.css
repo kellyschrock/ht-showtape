@@ -1,0 +1,569 @@
+/* ==========================================================================
+   Showtape. Built on ht-servo's design system (hitec.css): its tokens,
+   buttons, fields and tags. This sheet adds only the editor's own pieces,
+   the transport, the timeline and the inspector, out of those tokens.
+   ========================================================================== */
+
+:root {
+  --st-header-w: 220px;
+  --st-inspector-w: 340px;
+  --st-grid-major: color-mix(in srgb, var(--ht-ink) 14%, transparent);
+  --st-grid-minor: color-mix(in srgb, var(--ht-ink) 5%, transparent);
+  --st-lane-bg: var(--ht-surface);
+  --st-lane-bg-on: color-mix(in srgb, var(--ht-navy) 8%, var(--ht-surface));
+  --st-playhead: var(--ht-red);
+}
+
+.st-app {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100vh;
+  background: var(--ht-bg);
+}
+
+/* --------------------------------------------------------------------------
+   App bar
+   -------------------------------------------------------------------------- */
+
+.st-showname {
+  min-width: 0;
+  width: 22ch;
+  height: var(--ht-control-h);
+  padding: 0 var(--ht-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-on-dark);
+  font: inherit;
+  font-size: var(--ht-size-md);
+}
+.st-showname:hover,
+.st-showname:focus {
+  border-color: rgb(255 255 255 / 25%);
+  background: rgb(255 255 255 / 6%);
+}
+
+.st-dirty {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ht-gold);
+  flex: none;
+}
+
+.st-linkstatus {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.st-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--ht-radius-sm);
+  background: rgb(255 255 255 / 8%);
+}
+.st-segmented__label {
+  padding: 0 var(--ht-space-2);
+  color: rgb(255 255 255 / 55%);
+  font-size: var(--ht-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.st-segmented__item {
+  min-width: 64px;
+  height: 26px;
+  padding: 0 var(--ht-space-3);
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(255 255 255 / 80%);
+  font: inherit;
+  font-size: var(--ht-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.st-segmented__item:hover:enabled {
+  background: rgb(255 255 255 / 10%);
+}
+.st-segmented__item--on {
+  background: var(--ht-red-deep);
+  /* The app bar is dark in both themes, where red-deep is the light pink,
+     so dark ink reads on it and white does not. */
+  color: var(--ht-black);
+}
+.st-segmented__item--on:hover:enabled {
+  background: var(--ht-red-deep);
+}
+.st-segmented__item:disabled {
+  color: rgb(255 255 255 / 30%);
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   Transport
+   -------------------------------------------------------------------------- */
+
+.st-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-5);
+  padding: var(--ht-space-2) var(--ht-space-4);
+  background: var(--ht-surface-2);
+  border-bottom: 1px solid var(--ht-line);
+}
+.st-transport__group {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.st-tbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--ht-line-strong);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-surface);
+  color: var(--ht-ink-2);
+  cursor: pointer;
+}
+.st-tbtn svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+.st-tbtn:hover {
+  color: var(--ht-ink);
+  border-color: var(--ht-ink-3);
+}
+.st-tbtn--play {
+  width: 44px;
+}
+.st-tbtn--on {
+  background: var(--ht-navy-soft);
+  border-color: var(--ht-navy);
+  color: var(--ht-navy-deep);
+}
+.st-tbtn--play.st-tbtn--on {
+  background: var(--ht-red-soft);
+  border-color: var(--ht-red);
+  color: var(--ht-red-deep);
+}
+
+.st-clock {
+  display: grid;
+  min-width: 15ch;
+  padding: 2px var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-black);
+  font-family: var(--ht-font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.st-clock__tc {
+  color: #fff;
+  font-size: var(--ht-size-xl);
+  letter-spacing: 0.04em;
+}
+.st-clock__sub {
+  color: rgb(255 255 255 / 55%);
+  font-size: var(--ht-size-xs);
+}
+
+.st-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+.st-zoom .ht-range {
+  width: 140px;
+}
+
+.st-output {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  min-width: 0;
+}
+.st-output .ht-tag {
+  max-width: 40ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.st-live__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+.st-live .st-live__dot {
+  opacity: 1;
+  animation: st-pulse 1.2s ease-in-out infinite;
+}
+@keyframes st-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Main split
+   -------------------------------------------------------------------------- */
+
+.st-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--st-inspector-w);
+  min-height: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Timeline
+   -------------------------------------------------------------------------- */
+
+.st-timeline {
+  position: relative;
+  overflow: auto;
+  min-height: 0;
+  background: var(--ht-bg);
+}
+.st-timeline__inner {
+  position: relative;
+  min-height: 100%;
+}
+
+.st-timeline__top {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--ht-surface-2);
+  border-bottom: 1px solid var(--ht-line-strong);
+}
+.st-corner {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--ht-space-2);
+  flex: none;
+  background: var(--ht-surface-2);
+  border-right: 1px solid var(--ht-line-strong);
+}
+
+.st-ruler {
+  position: relative;
+  flex: none;
+  height: 100%;
+  cursor: ew-resize;
+}
+.st-ruler__mark {
+  position: absolute;
+  top: 0;
+  padding: 3px 0 0 4px;
+  color: var(--ht-ink-3);
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.st-track {
+  display: flex;
+  border-bottom: 1px solid var(--ht-line);
+}
+.st-track__header {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 2px;
+  flex: none;
+  width: var(--st-header-w);
+  padding: var(--ht-space-2) var(--ht-space-3) var(--ht-space-2) calc(var(--ht-space-3) + 4px);
+  background: var(--ht-surface-2);
+  border-right: 1px solid var(--ht-line-strong);
+  cursor: pointer;
+}
+.st-track__header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--st-track-color);
+}
+.st-track__header--on {
+  background: color-mix(in srgb, var(--ht-navy) 16%, var(--ht-surface-2));
+}
+.st-track__name {
+  overflow: hidden;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.st-track__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  color: var(--ht-ink-3);
+  font-size: var(--ht-size-xs);
+}
+.st-proto {
+  padding: 0 6px;
+  border-radius: var(--ht-radius-pill);
+  border: 1px solid var(--ht-line-strong);
+  white-space: nowrap;
+}
+.st-proto--own {
+  border-color: var(--ht-gold);
+  color: var(--ht-gold);
+}
+.st-track__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--ht-space-1);
+}
+.st-track__value {
+  margin-left: auto;
+  color: var(--ht-ink-2);
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+.st-ms {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--ht-line-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ht-ink-3);
+  font: inherit;
+  font-size: var(--ht-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.st-ms--mute {
+  background: var(--ht-ink-3);
+  border-color: var(--ht-ink-3);
+  color: var(--ht-bg);
+}
+.st-ms--solo {
+  background: var(--ht-gold);
+  border-color: var(--ht-gold);
+  color: #141416;
+}
+
+.st-track__lane {
+  flex: none;
+  background-color: var(--st-lane-bg);
+}
+.st-track__lane--on {
+  background-color: var(--st-lane-bg-on);
+}
+.st-track--muted .st-track__lane {
+  opacity: 0.45;
+}
+
+.st-lane {
+  display: block;
+  overflow: visible;
+}
+.st-lane__zero {
+  stroke: var(--ht-line-strong);
+  stroke-dasharray: 3 4;
+}
+.st-lane__curve {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.st-key {
+  cursor: grab;
+}
+.st-key:active {
+  cursor: grabbing;
+}
+.st-key__hit {
+  fill: transparent;
+}
+.st-key__mark {
+  fill: var(--st-lane-bg);
+  stroke-width: 2;
+}
+.st-key:hover .st-key__mark {
+  fill: var(--ht-ink-3);
+}
+.st-key--on .st-key__mark {
+  fill: #fff;
+  stroke: #fff !important;
+  filter: drop-shadow(0 0 3px rgb(255 255 255 / 60%));
+}
+
+.st-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  width: 1px;
+  background: var(--st-playhead);
+  pointer-events: none;
+}
+.st-playhead__head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  width: 11px;
+  height: 11px;
+  margin-left: -5px;
+  background: var(--st-playhead);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.st-empty,
+.st-hintline {
+  padding: var(--ht-space-4);
+  color: var(--ht-ink-3);
+  font-size: var(--ht-size-sm);
+}
+.st-hintline {
+  position: sticky;
+  left: var(--st-header-w);
+  width: max-content;
+}
+
+/* --------------------------------------------------------------------------
+   Inspector
+   -------------------------------------------------------------------------- */
+
+.st-inspector {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: var(--ht-surface);
+  border-left: 1px solid var(--ht-line-strong);
+}
+.st-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--ht-line);
+}
+.st-tab {
+  flex: 1;
+  height: 38px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ht-ink-2);
+  font: inherit;
+  font-size: var(--ht-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.st-tab:hover {
+  color: var(--ht-ink);
+}
+.st-tab--on {
+  border-bottom-color: var(--ht-red);
+  color: var(--ht-ink);
+}
+.st-inspector__body {
+  display: grid;
+  align-content: start;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-4);
+  overflow: auto;
+}
+
+.st-section {
+  display: grid;
+  gap: var(--ht-space-2);
+  padding-bottom: var(--ht-space-4);
+  border-bottom: 1px solid var(--ht-line);
+}
+.st-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+}
+.st-section__head h3 {
+  margin: 0;
+  color: var(--ht-ink-2);
+  font-size: var(--ht-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.st-field {
+  grid-template-columns: 11ch minmax(0, 1fr);
+}
+.st-field__control {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.st-field__control .ht-select {
+  width: 100%;
+  min-width: 0;
+}
+.st-num {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+.st-num__suffix {
+  color: var(--ht-ink-3);
+  font-size: var(--ht-size-xs);
+}
+.st-wide {
+  width: 100%;
+  text-align: left;
+}
+.st-time {
+  width: 11ch;
+  font-family: var(--ht-font-mono);
+}
+.st-color {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--ht-line-strong);
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+}
+.st-grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.st-servolist {
+  display: grid;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-servolist__item {
+  display: grid;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: 1px solid var(--ht-line);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-surface-2);
+}
+.st-servolist__title {
+  font-weight: 600;
+}

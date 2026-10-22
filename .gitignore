@@ -1,0 +1,9 @@
+node_modules/
+
+# Build output
+dist/
+dist-web/
+dist-electron/
+
+logs/
+*.log
