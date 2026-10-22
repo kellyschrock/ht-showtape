@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { spawn } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { SerialLinkHost } from '../../ht-servo/electron/serial-link'
@@ -98,36 +99,99 @@ async function rememberShowDir(file: string): Promise<void> {
   }
 }
 
+/**
+ * A file chosen through zenity, Linux's stock GTK chooser tool. Electron's
+ * own GTK dialog (42 to 45 at least) mishandles keyboard use: Enter or a
+ * double-click on a file comes back as cancelled, so the open or save
+ * silently does nothing. zenity's chooser behaves.
+ *
+ * Resolves to the path, null when cancelled, or undefined when zenity is
+ * not there to ask, so the caller can fall back to Electron's dialog.
+ */
+function zenityFile(args: string[]): Promise<string | null | undefined> {
+  if (process.platform !== 'linux') return Promise.resolve(undefined)
+  const attach: string[] = []
+  // Keeps the chooser above the editor. A window handle is an X11 id only off Wayland.
+  if (mainWindow && process.env.XDG_SESSION_TYPE !== 'wayland') {
+    attach.push('--modal', `--attach=${mainWindow.getNativeWindowHandle().readUInt32LE(0)}`)
+  }
+  return new Promise((resolve) => {
+    const child = spawn('zenity', ['--file-selection', ...attach, ...args], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    let out = ''
+    child.stdout.on('data', (chunk: Buffer) => (out += chunk.toString('utf8')))
+    child.on('error', () => resolve(undefined))
+    child.on('close', (code) => {
+      const file = out.replace(/\n$/, '')
+      if (code === 0 && file) resolve(file)
+      // 1 is cancel or close; anything else is zenity failing, so let Electron try.
+      else resolve(code === 1 ? null : undefined)
+    })
+  })
+}
+
+const ZENITY_FILTER = '--file-filter=Showtape | *.showtape.json *.json'
+
+/** One file dialog at a time: zenity does not stop clicks reaching the editor. */
+let choosing = false
+
+async function chooseFile(kind: 'open' | 'save', defaultPath: string): Promise<string | null> {
+  if (!mainWindow || choosing) return null
+  choosing = true
+  try {
+    const zenityArgs =
+      kind === 'open'
+        ? ['--title=Open show', `--filename=${defaultPath}${path.sep}`, ZENITY_FILTER]
+        : [
+            '--title=Save show',
+            '--save',
+            '--confirm-overwrite',
+            `--filename=${defaultPath}`,
+            ZENITY_FILTER,
+          ]
+    const picked = await zenityFile(zenityArgs)
+    if (picked !== undefined) return picked
+
+    if (kind === 'open') {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        defaultPath,
+        properties: ['openFile'],
+        filters: SHOW_FILTERS,
+      })
+      return result.canceled ? null : (result.filePaths[0] ?? null)
+    }
+    const result = await dialog.showSaveDialog(mainWindow, { defaultPath, filters: SHOW_FILTERS })
+    return result.canceled ? null : (result.filePath ?? null)
+  } finally {
+    choosing = false
+  }
+}
+
 // Show files. The renderer never sees a path it did not get from a dialog.
 ipcMain.handle('show:open', async () => {
-  if (!mainWindow) return null
-  const result = await dialog.showOpenDialog(mainWindow, {
-    defaultPath: await lastShowDir(),
-    properties: ['openFile'],
-    filters: SHOW_FILTERS,
-  })
-  const file = result.filePaths[0]
-  if (result.canceled || !file) return null
+  const file = await chooseFile('open', await lastShowDir())
+  if (!file) return null
   const text = await readFile(file, 'utf8')
   await rememberShowDir(file)
   return { path: file, text }
 })
 
-ipcMain.handle('show:save', async (_event, request: { text: string; path: string | null; name: string }) => {
-  if (!mainWindow) return null
-  let file = request.path
-  if (!file) {
-    const result = await dialog.showSaveDialog(mainWindow, {
-      defaultPath: path.join(await lastShowDir(), `${request.name || 'Untitled'}.showtape.json`),
-      filters: SHOW_FILTERS,
-    })
-    if (result.canceled || !result.filePath) return null
-    file = result.filePath
-  }
-  await writeFile(file, request.text, 'utf8')
-  await rememberShowDir(file)
-  return { path: file }
-})
+ipcMain.handle(
+  'show:save',
+  async (_event, request: { text: string; path: string | null; name: string }) => {
+    const file =
+      request.path ??
+      (await chooseFile(
+        'save',
+        path.join(await lastShowDir(), `${request.name || 'Untitled'}.showtape.json`),
+      ))
+    if (!file) return null
+    await writeFile(file, request.text, 'utf8')
+    await rememberShowDir(file)
+    return { path: file }
+  },
+)
 
 void app.whenReady().then(() => {
   createWindow()

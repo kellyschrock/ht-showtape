@@ -22,6 +22,9 @@ sibling [ht-servo](../ht-servo) checkout.
 ## Getting started
 
 Requires Node 22 or newer, and `../ht-servo` checked out beside this repo.
+On Linux, the open and save dialogs use `zenity` (standard on Ubuntu)
+when it is installed, because Electron's own dialog treats Enter and
+double-click as Cancel.
 
 ```bash
 npm install
