@@ -9,11 +9,14 @@ import { newFile, openFile } from './fileActions'
  * in a field, where Space and Delete belong to the text.
  */
 function typing(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  return target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
+  // Duck-typed: an element in the monitor window is not this window's HTMLElement.
+  const el = target as Partial<HTMLElement> | null
+  if (!el || typeof el.tagName !== 'string') return false
+  return el.isContentEditable === true || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName)
 }
 
-export function useShortcuts(): void {
+/** Listens on `view`: the editor's window, or the popped-out monitor so its keys work too. */
+export function useShortcuts(view: Window = window): void {
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const show = useShow.getState()
@@ -133,7 +136,7 @@ export function useShortcuts(): void {
           break
       }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+    view.addEventListener('keydown', onKey)
+    return () => view.removeEventListener('keydown', onKey)
+  }, [view])
 }

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Channel } from '../show/model'
 import { servoDegrees } from '../show/sample'
 import { ServoMonitor, type SimServo } from '../playback/monitor'
+import { useMonitor } from '../stores/monitor'
 import { useShow } from '../stores/show'
 import { showTime } from '../stores/transport'
+import { useShortcuts } from './shortcuts'
 
 /**
  * Simulated servos: a dial per channel whose horn turns as the show plays,
@@ -21,37 +24,86 @@ function same(a: readonly SimServo[], b: readonly SimServo[]): boolean {
   )
 }
 
-/** Steps the simulation once a frame while the panel is open. */
-function useSimServos(): SimServo[] {
+/**
+ * Steps the simulation once a frame of `view`, the window it is drawn in.
+ * A window's frames and its clock go together, and the editor's own frames
+ * stop while it is minimised behind a popped-out monitor.
+ */
+function useSimServos(view: Window): SimServo[] {
   const [servos, setServos] = useState<SimServo[]>([])
   useEffect(() => {
     const monitor = new ServoMonitor()
-    let prev = performance.now()
+    let prev = view.performance.now()
     let frame = 0
     const tick = (now: number) => {
       const next = monitor.step(useShow.getState().show, showTime(), now - prev)
       prev = now
       setServos((old) => (same(old, next) ? old : next))
-      frame = requestAnimationFrame(tick)
+      frame = view.requestAnimationFrame(tick)
     }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [])
+    frame = view.requestAnimationFrame(tick)
+    return () => view.cancelAnimationFrame(frame)
+  }, [view])
   return servos
 }
 
+/** The Monitor tab: the dials, or word of where they went while popped out. */
 export function MonitorPanel() {
-  const channels = useShow((s) => s.show.channels)
-  const servos = useSimServos()
-  const byId = new Map(servos.map((s) => [s.channelId, s]))
+  const popup = useMonitor((s) => s.popup)
+  if (popup) {
+    return (
+      <div className="st-monitor-away">
+        <p className="ht-hint">The monitor is open in its own window.</p>
+        <div className="ht-row">
+          <button type="button" className="ht-btn ht-btn--sm ht-btn--secondary" onClick={() => popup.focus()}>
+            Show window
+          </button>
+          <button type="button" className="ht-btn ht-btn--sm ht-btn--ghost" onClick={() => useMonitor.getState().dock()}>
+            Bring back
+          </button>
+        </div>
+      </div>
+    )
+  }
+  return <Monitor view={window} />
+}
 
-  if (channels.length === 0) return <p className="ht-hint">Add a channel to see its servo here.</p>
+/** Draws the monitor into its own window while it is popped out. Mounted once, by App. */
+export function MonitorPopout() {
+  const popup = useMonitor((s) => s.popup)
+  const root = popup?.document.getElementById('monitor-root')
+  return popup && root ? createPortal(<PoppedMonitor popup={popup} />, root) : null
+}
+
+function PoppedMonitor({ popup }: { popup: Window }) {
+  // Space, Home and the rest work with the monitor window in front too.
+  useShortcuts(popup)
+  return <Monitor view={popup} />
+}
+
+function Monitor({ view }: { view: Window }) {
+  const channels = useShow((s) => s.show.channels)
+  const servos = useSimServos(view)
+  const byId = new Map(servos.map((s) => [s.channelId, s]))
+  const popped = view !== window
+
   return (
     <>
-      <p className="ht-hint">
-        Simulated servos, told what real ones would be: limits, invert, trim, max speed, mute and solo. A dashed horn is
-        where the curve wants a servo the speed limit is holding back.
-      </p>
+      <div className="st-monitor-head">
+        <p className="ht-hint">
+          Simulated servos, told what real ones would be: limits, invert, trim, max speed, mute and solo. A dashed horn
+          is where the curve wants a servo the speed limit is holding back.
+        </p>
+        <button
+          type="button"
+          className="ht-btn ht-btn--sm ht-btn--ghost st-monitor-head__btn"
+          title={popped ? 'Dock the monitor back in the editor' : 'Open the monitor in its own window, for another screen'}
+          onClick={() => (popped ? useMonitor.getState().dock() : useMonitor.getState().popOut())}
+        >
+          {popped ? 'Dock' : 'Pop out ↗'}
+        </button>
+      </div>
+      {channels.length === 0 ? <p className="ht-hint">Add a channel to see its servo here.</p> : null}
       <div className="st-monitor">
         {channels.map((c) => {
           const servo = byId.get(c.id)

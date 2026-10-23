@@ -684,3 +684,27 @@
 .st-dial--held {
   opacity: 0.5;
 }
+
+.st-monitor-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.st-monitor-head__btn {
+  flex: none;
+}
+.st-monitor-away {
+  display: grid;
+  gap: 10px;
+}
+/* The popped-out monitor window: just the dials, larger. */
+.st-popout {
+  margin: 0;
+  padding: 16px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--ht-bg);
+}
+.st-popout .st-monitor {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}

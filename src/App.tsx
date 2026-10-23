@@ -5,6 +5,7 @@ import { Timeline } from './ui/Timeline'
 import { Inspector, type InspectorTab } from './ui/Inspector'
 import { useShortcuts } from './ui/shortcuts'
 import { useUnsavedGuard } from './ui/fileActions'
+import { MonitorPopout } from './ui/MonitorPanel'
 
 export function App() {
   const [tab, setTab] = useState<InspectorTab>('selection')
@@ -19,6 +20,7 @@ export function App() {
         <Timeline />
         <Inspector tab={tab} onTab={setTab} />
       </main>
+      <MonitorPopout />
     </div>
   )
 }

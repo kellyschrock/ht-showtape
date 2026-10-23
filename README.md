@@ -53,6 +53,8 @@ npm run dev                           # browser only, at the printed URL
 - The **Monitor** tab shows a simulated servo per channel, its horn
   turning as the show plays or scrubs. It runs the same limits, speed
   limit, mute and solo as live output, so no adapter is needed to watch.
+  **Pop out** moves it to its own window, for another screen; closing that
+  window docks it again.
 - **Duplicate channel** in the Inspector, or **Ctrl+D**, copies the
   selected channel with its keys and limits. The copy goes on the next
   free servo and node IDs, so retarget it before playing.

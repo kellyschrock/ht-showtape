@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen, type Rectangle } from 'electron'
 import { spawn } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { SerialLinkHost } from '../../ht-servo/electron/serial-link'
 
@@ -30,11 +31,16 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Playback and servo output run on this page's timers. Chromium slows
+      // a hidden page's timers to once a second, which would stall the show
+      // whenever the editor is minimised behind the monitor window.
+      backgroundThrottling: false,
     },
   })
 
   mainWindow.setMenuBarVisibility(false)
   links.attach(mainWindow)
+  allowMonitorWindow(mainWindow)
 
   if (DEV_SERVER) {
     void mainWindow.loadURL(DEV_SERVER)
@@ -62,6 +68,53 @@ function createWindow(): void {
   })
   mainWindow.on('closed', () => {
     mainWindow = null
+    monitorWindow?.close()
+  })
+}
+
+/** The window.open() name the renderer uses for the monitor. Nothing else may open a window. */
+const MONITOR_FRAME = 'showtape-monitor'
+let monitorWindow: BrowserWindow | null = null
+
+/** Saved bounds, if they still land on a connected screen. */
+function monitorBounds(): Partial<Rectangle> {
+  const saved = readSettings().monitorBounds
+  if (!saved || typeof saved.width !== 'number') return { width: 720, height: 520 }
+  const visible = screen.getAllDisplays().some(({ workArea: w }) => {
+    return saved.x < w.x + w.width && saved.x + saved.width > w.x && saved.y < w.y + w.height && saved.y + saved.height > w.y
+  })
+  return visible ? saved : { width: saved.width, height: saved.height }
+}
+
+/**
+ * The monitor pops out as a window the renderer opens itself and draws
+ * into, so both windows share one show, clock and simulation. Electron
+ * only has to allow it, size it, and remember where it was put.
+ */
+function allowMonitorWindow(parent: BrowserWindow): void {
+  parent.webContents.setWindowOpenHandler(({ frameName }) => {
+    if (frameName !== MONITOR_FRAME) return { action: 'deny' }
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        ...monitorBounds(),
+        minWidth: 320,
+        minHeight: 240,
+        title: 'Monitor — Showtape',
+        backgroundColor: '#131417',
+        autoHideMenuBar: true,
+        webPreferences: { backgroundThrottling: false },
+      },
+    }
+  })
+  parent.webContents.on('did-create-window', (child, { frameName }) => {
+    if (frameName !== MONITOR_FRAME) return
+    monitorWindow = child
+    child.setMenuBarVisibility(false)
+    child.on('close', () => writeSettings({ monitorBounds: child.getBounds() }))
+    child.on('closed', () => {
+      if (monitorWindow === child) monitorWindow = null
+    })
   })
 }
 
@@ -110,33 +163,45 @@ ipcMain.handle('link:write', (_event, id: number, bytes: Uint8Array) => links.wr
 ipcMain.handle('link:setSignals', (_event, id: number, signals) => links.setSignals(id, signals))
 ipcMain.handle('link:flushInput', (_event, id: number) => links.flushInput(id))
 
-// The folder the last show was opened from or saved to, so the dialogs
-// start there next time, across restarts. Without it, they start wherever
-// the platform likes, which on Linux is often ~/Downloads.
+// Small settings kept between runs, in one file. Written synchronously: the
+// monitor window's place is saved as the app quits, when an async write
+// could be cut off.
 const SETTINGS_FILE = path.join(app.getPath('userData'), 'settings.json')
 
-async function lastShowDir(): Promise<string> {
-  try {
-    const settings = JSON.parse(await readFile(SETTINGS_FILE, 'utf8')) as { showDir?: unknown }
-    if (typeof settings.showDir === 'string') return settings.showDir
-  } catch {
-    // No settings yet, or unreadable: fall back below.
-  }
-  return app.getPath('documents')
+interface Settings {
+  /** The folder the last show was opened from or saved to. */
+  showDir?: string
+  monitorBounds?: Rectangle
 }
 
-async function rememberShowDir(file: string): Promise<void> {
+function readSettings(): Settings {
   try {
-    await mkdir(path.dirname(SETTINGS_FILE), { recursive: true })
-    await writeFile(
-      SETTINGS_FILE,
-      JSON.stringify({ showDir: path.dirname(file) }, null, 2) + '\n',
-      'utf8',
-    )
-  } catch (error) {
-    // Only a convenience; a failure here must not fail the open or save.
-    console.error(`Could not remember the show folder in ${SETTINGS_FILE}:`, error)
+    const raw = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8')) as unknown
+    return typeof raw === 'object' && raw !== null ? (raw as Settings) : {}
+  } catch {
+    return {}
   }
+}
+
+function writeSettings(patch: Settings): void {
+  try {
+    mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true })
+    writeFileSync(SETTINGS_FILE, JSON.stringify({ ...readSettings(), ...patch }, null, 2) + '\n', 'utf8')
+  } catch (error) {
+    // Only a convenience; a failure here must not fail what triggered it.
+    console.error(`Could not save settings to ${SETTINGS_FILE}:`, error)
+  }
+}
+
+// The dialogs start in the last show's folder. Without it, they start
+// wherever the platform likes, which on Linux is often ~/Downloads.
+function lastShowDir(): string {
+  const dir = readSettings().showDir
+  return typeof dir === 'string' ? dir : app.getPath('documents')
+}
+
+function rememberShowDir(file: string): void {
+  writeSettings({ showDir: path.dirname(file) })
 }
 
 /**
@@ -210,10 +275,10 @@ async function chooseFile(kind: 'open' | 'save', defaultPath: string): Promise<s
 
 // Show files. The renderer never sees a path it did not get from a dialog.
 ipcMain.handle('show:open', async () => {
-  const file = await chooseFile('open', await lastShowDir())
+  const file = await chooseFile('open', lastShowDir())
   if (!file) return null
   const text = await readFile(file, 'utf8')
-  await rememberShowDir(file)
+  rememberShowDir(file)
   return { path: file, text }
 })
 
@@ -224,11 +289,11 @@ ipcMain.handle(
       request.path ??
       (await chooseFile(
         'save',
-        path.join(await lastShowDir(), `${request.name || 'Untitled'}.showtape.json`),
+        path.join(lastShowDir(), `${request.name || 'Untitled'}.showtape.json`),
       ))
     if (!file) return null
     await writeFile(file, request.text, 'utf8')
-    await rememberShowDir(file)
+    rememberShowDir(file)
     return { path: file }
   },
 )
