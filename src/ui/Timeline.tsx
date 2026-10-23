@@ -116,14 +116,19 @@ function Playhead({ zoom, scroller }: { zoom: number; scroller: RefObject<HTMLDi
   const playing = useTransport((s) => s.playing)
   const x = HEADER_W + xOf(t, zoom)
 
-  // Page along with the playhead while playing, as an editor does.
+  // Page along with the playhead as it plays, and go to it when it is sent
+  // somewhere off screen (Home, End, the arrow keys). A zoom moves it too,
+  // but zooming keeps its own anchor, so only a change of time scrolls.
+  const lastT = useRef(t)
   useEffect(() => {
+    const moved = t !== lastT.current
+    lastT.current = t
     const el = scroller.current
-    if (!el || !playing) return
+    if (!el || !(moved || playing)) return
     const left = el.scrollLeft + HEADER_W
     const right = el.scrollLeft + el.clientWidth - 40
     if (x > right || x < left) el.scrollLeft = x - HEADER_W - 40
-  }, [x, playing, scroller])
+  }, [t, x, playing, scroller])
 
   return (
     <div className="st-playhead" style={{ transform: `translateX(${x}px)` }}>
