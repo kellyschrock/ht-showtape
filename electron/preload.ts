@@ -6,7 +6,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron'
-import '../../ht-servo/electron/preload'
+import '../ht-servo/electron/preload'
 
 contextBridge.exposeInMainWorld('showtape', {
   files: {

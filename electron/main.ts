@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { SerialLinkHost } from '../../ht-servo/electron/serial-link'
+import { SerialLinkHost } from '../ht-servo/electron/serial-link'
 
 // Bundled to CommonJS, so __dirname is the real one.
 const dirname = __dirname

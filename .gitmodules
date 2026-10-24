@@ -1,0 +1,4 @@
+[submodule "ht-servo"]
+	path = ht-servo
+	url = https://github.com/kellyschrock/ht-servo.git
+	branch = transport-update

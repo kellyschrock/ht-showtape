@@ -22,7 +22,7 @@ const showLayering = {
 }
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'dist-web/**', 'dist-electron/**', 'dist-player/**', 'node_modules/**'] },
+  { ignores: ['dist/**', 'dist-web/**', 'dist-electron/**', 'dist-player/**', 'node_modules/**', 'ht-servo/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
