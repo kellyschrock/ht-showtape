@@ -1,0 +1,78 @@
+{
+  // Run and debug Showtape from VS Code. Each runs the same dev loop as
+  // `npm run dev:electron`: Vite serves the editor with hot reload, and the
+  // main process and preload are rebuilt from electron/.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Showtape",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/scripts/dev-electron.mjs",
+      "autoAttachChildProcesses": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Showtape (simulator)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/scripts/dev-electron.mjs",
+      "args": ["--simulator"],
+      "autoAttachChildProcesses": false,
+      "console": "integratedTerminal"
+    },
+    {
+      // Opens the inspector ports the two attach configurations below use.
+      // Run "Debug Showtape" rather than this on its own.
+      "name": "Showtape (debug ports)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/scripts/dev-electron.mjs",
+      "args": ["--inspect=9229", "--remote-debugging-port=9222"],
+      "autoAttachChildProcesses": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Attach to main process",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "timeout": 30000,
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist-electron/**/*.cjs"]
+    },
+    {
+      "name": "Attach to editor",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "timeout": 30000,
+      "webRoot": "${workspaceFolder}",
+      // The editor window, not the Monitor pop-out.
+      "urlFilter": "http://localhost:5174/*"
+    },
+    {
+      // Plays the show file open in the editor, to the simulated adapter.
+      "name": "Play this show (simulator)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "npm: build:player",
+      "program": "${workspaceFolder}/dist-player/showtape-play.cjs",
+      "args": ["${file}", "--simulator", "--verbose"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist-player/**/*.cjs"],
+      "console": "integratedTerminal"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Showtape",
+      "configurations": ["Showtape (debug ports)", "Attach to main process", "Attach to editor"],
+      "stopAll": true
+    }
+  ]
+}
