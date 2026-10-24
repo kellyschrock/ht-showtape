@@ -82,7 +82,7 @@ function downloadText(text: string, name: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
   const a = document.createElement('a')
   a.href = url
-  a.download = `${name || 'Untitled'}.showtape.json`
+  a.download = `${name || 'Untitled'}.showtape`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -91,7 +91,7 @@ function pickFileText(): Promise<{ name: string; text: string } | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.json,application/json'
+    input.accept = '.showtape,.json,application/json'
     input.onchange = () => {
       const file = input.files?.[0]
       if (!file) return resolve(null)

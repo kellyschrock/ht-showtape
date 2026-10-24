@@ -13,7 +13,8 @@ const DEV_SERVER = process.env.VITE_DEV_SERVER_URL
 let mainWindow: BrowserWindow | null = null
 const links = new SerialLinkHost()
 
-const SHOW_FILTERS = [{ name: 'Showtape', extensions: ['showtape.json', 'json'] }]
+// Shows are saved as .showtape. Older ones end .showtape.json, and still open.
+const SHOW_FILTERS = [{ name: 'Showtape', extensions: ['showtape', 'json'] }]
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -236,7 +237,7 @@ function zenityFile(args: string[]): Promise<string | null | undefined> {
   })
 }
 
-const ZENITY_FILTER = '--file-filter=Showtape | *.showtape.json *.json'
+const ZENITY_FILTER = '--file-filter=Showtape | *.showtape *.showtape.json *.json'
 
 /** One file dialog at a time: zenity does not stop clicks reaching the editor. */
 let choosing = false
@@ -289,7 +290,7 @@ ipcMain.handle(
       request.path ??
       (await chooseFile(
         'save',
-        path.join(lastShowDir(), `${request.name || 'Untitled'}.showtape.json`),
+        path.join(lastShowDir(), `${request.name || 'Untitled'}.showtape`),
       ))
     if (!file) return null
     await writeFile(file, request.text, 'utf8')

@@ -14,7 +14,7 @@ sibling [ht-servo](../ht-servo) checkout.
 | Timeline editor: channels, keyframes, smooth/linear/hold curves, undo, snapping | Done |
 | Time source: a plain clock, with an optional tempo grid | Done |
 | Servo output: per-channel protocol, limits, speed limiting, live scrubbing | Done against the simulator |
-| Show files (`.showtape.json`) | Done |
+| Show files (`.showtape`) | Done |
 | Audio source | Planned |
 | MIDI source (`.mid` files) | Planned |
 | SMPTE source (LTC and MIDI timecode) | Planned |
