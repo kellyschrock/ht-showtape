@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Showtape's icon: a keyframed curve over a timeline, in the editor's colours. -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="#131417"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#2a2d35" stroke-width="8"/>
+  <g stroke="#2a2d35" stroke-width="6">
+    <line x1="96" y1="112" x2="96" y2="400"/>
+    <line x1="208" y1="112" x2="208" y2="400"/>
+    <line x1="320" y1="112" x2="320" y2="400"/>
+    <line x1="432" y1="112" x2="432" y2="400"/>
+  </g>
+  <path d="M72 352 C 136 352, 136 168, 200 168 S 264 312, 312 312 S 392 136, 440 136" fill="none" stroke="#5b76d9" stroke-width="26" stroke-linecap="round"/>
+  <g fill="#e0ba78" stroke="#131417" stroke-width="8">
+    <circle cx="72" cy="352" r="22"/>
+    <circle cx="200" cy="168" r="22"/>
+    <circle cx="312" cy="312" r="22"/>
+    <circle cx="440" cy="136" r="22"/>
+  </g>
+  <line x1="256" y1="84" x2="256" y2="428" stroke="#ff5c6b" stroke-width="10" stroke-linecap="round"/>
+</svg>

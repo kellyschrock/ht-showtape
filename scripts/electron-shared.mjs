@@ -11,9 +11,9 @@ export const shared = {
   target: 'node20',
   sourcemap: true,
   logLevel: 'info',
-  // Electron is supplied by the runtime. serialport and koffi carry native
-  // bindings, so they load from this app's node_modules at run time.
-  external: ['electron', 'serialport', 'koffi'],
+  // Electron is supplied by the runtime. serialport carries a native
+  // binding, so it loads from this app's node_modules at run time.
+  external: ['electron', 'serialport'],
 }
 
 export const entries = [

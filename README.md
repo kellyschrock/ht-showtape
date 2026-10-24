@@ -111,6 +111,21 @@ npm install serialport@13
 
 `player/showtape-play.service` is a systemd unit to start it at boot.
 
+## Installing on Linux
+
+```bash
+npm run dist:linux                 # writes dist/showtape_<version>_amd64.deb
+sudo apt install ./dist/showtape_0.1.0_amd64.deb
+```
+
+It installs to `/opt/Showtape` with a `showtape` command and a menu entry,
+and opens `.showtape` files double-clicked in the file manager. With the app
+already open, they open in its window, which asks about unsaved changes
+first. zenity comes with it as a recommended package.
+
+To reach the adapter, the user must be in the `dialout` group:
+`sudo usermod -aG dialout $USER`, then log out and back in.
+
 ## Updating ht-servo
 
 Showtape builds against the ht-servo commit the submodule is pinned to, not
@@ -130,6 +145,7 @@ point its remote at a local checkout.
 ```
 electron/        main process and preload. The serial host and the htservo
                  bridge are ht-servo's own, imported from ht-servo/
+build/           the app icon, for packaging
 ht-servo/        the ht-servo submodule
 player/          showtape-play's command line and its serial link
 src/
