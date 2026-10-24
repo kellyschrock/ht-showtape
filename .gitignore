@@ -4,6 +4,7 @@ node_modules/
 dist/
 dist-web/
 dist-electron/
+dist-player/
 
 logs/
 *.log

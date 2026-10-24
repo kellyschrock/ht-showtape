@@ -9,9 +9,10 @@
     "dev:electron": "node scripts/dev-electron.mjs",
     "build:web": "vite build",
     "build:electron": "node scripts/build-electron.mjs",
+    "build:player": "node scripts/build-player.mjs",
     "start": "npm run build:web && npm run build:electron && electron .",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit && tsc -p player/tsconfig.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"electron/**/*.ts\""
   },

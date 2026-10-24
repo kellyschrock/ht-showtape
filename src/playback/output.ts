@@ -87,6 +87,11 @@ export class ServoOutput {
     return this.stats_
   }
 
+  /** Where each channel was last told to go, in degrees at the servo. */
+  get positions(): ReadonlyMap<string, number> {
+    return this.lastDegrees
+  }
+
   /**
    * Starts sending. Each servo's present position is read first, so the
    * speed limit eases it from where it actually is rather than snapping it

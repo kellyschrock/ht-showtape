@@ -75,15 +75,46 @@ position is read first, so the first move eases from where the servo actually
 is. A show file with a missing or malformed limit loads with the safe default
 rather than none.
 
+## Playing a finished show
+
+`showtape-play` plays a show with no screen, for the figure once it is built:
+a Raspberry Pi with the DPC-20 on USB, say, started at boot. It sends through
+the same output as Servos live, so the figure moves as it did in the editor.
+
+```bash
+npm run build:player                     # writes dist-player/showtape-play.cjs
+node dist-player/showtape-play.cjs show.showtape --loop --gap 10
+node dist-player/showtape-play.cjs show.showtape --simulator   # no hardware
+```
+
+Before playing it eases every servo slowly (`--home-speed`, 30 deg/s by
+default) from wherever it is to the show's first pose. When the show ends,
+or on Ctrl+C or `systemctl stop`, it eases them back to rest before letting
+go; a second Ctrl+C quits at once. Solo is ignored and mute is kept. If the
+adapter goes away it exits with an error, for systemd to restart it.
+
+On the Pi, Node 20 or later, the bundle and serialport are all it needs; the
+rest of this repo and ht-servo are only for building it:
+
+```bash
+mkdir -p /opt/showtape && cd /opt/showtape
+cp /path/to/showtape-play.cjs /path/to/show.showtape .
+npm install serialport@13
+```
+
+`player/showtape-play.service` is a systemd unit to start it at boot.
+
 ## How it fits together
 
 ```
 electron/        main process and preload. The serial host and the htservo
                  bridge are ht-servo's own, imported from ../ht-servo
+player/          showtape-play's command line and its serial link
 src/
   show/          the show document, curve sampling, limits, timecode. Pure
   clock/         timeline clocks. The time source today, audio/MIDI/SMPTE next
   playback/      ServoOutput: samples the show and writes positions to the bus
+  player/        Player: homes, plays, loops and rests, for showtape-play
   stores/        the open show (with undo) and the transport
   ui/            app bar, transport, timeline, inspector
 ```
@@ -96,5 +127,5 @@ src/
 npm test
 npm run typecheck
 npm run lint
-npm run build:web && npm run build:electron
+npm run build:web && npm run build:electron && npm run build:player
 ```

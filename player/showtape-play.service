@@ -1,0 +1,24 @@
+# systemd unit for playing a show at boot. Copy to /etc/systemd/system/,
+# adjust the paths, user and options, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now showtape-play
+# Logs: journalctl -u showtape-play -f
+
+[Unit]
+Description=Showtape player
+After=network.target
+
+[Service]
+Type=simple
+# A user in the dialout group, so it may open the adapter's serial port.
+User=pi
+SupplementaryGroups=dialout
+WorkingDirectory=/opt/showtape
+ExecStart=/usr/bin/node /opt/showtape/showtape-play.cjs /opt/showtape/show.showtape --loop --gap 10
+# A stop eases the figure to rest first; allow it the time.
+TimeoutStopSec=30
+# An unplugged adapter ends the player with an error; try again shortly.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

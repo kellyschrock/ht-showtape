@@ -22,7 +22,7 @@ const showLayering = {
 }
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'dist-web/**', 'dist-electron/**', 'node_modules/**'] },
+  { ignores: ['dist/**', 'dist-web/**', 'dist-electron/**', 'dist-player/**', 'node_modules/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -34,7 +34,7 @@ export default tseslint.config(
   },
   showLayering,
   {
-    files: ['electron/**/*.ts', 'scripts/**/*.mjs'],
+    files: ['electron/**/*.ts', 'player/**/*.ts', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: { console: 'readonly', process: 'readonly', __dirname: 'readonly', Buffer: 'readonly' },
     },
