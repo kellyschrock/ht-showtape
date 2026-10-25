@@ -8,8 +8,8 @@
  */
 
 import { SerialPort } from 'serialport'
-import { LinkEmitter } from '../../ht-servo/src/transport/link'
-import type { CloseOptions, Link, OpenOptions, PortInfo, Signals, Unsubscribe } from '../../ht-servo/src/transport/link'
+import { LinkEmitter } from '../ht-servo/src/transport/link'
+import type { CloseOptions, Link, OpenOptions, PortInfo, Signals, Unsubscribe } from '../ht-servo/src/transport/link'
 
 /** USB bridges the adapters are built on, as ht-servo's port list sorts them. */
 const LIKELY_BRIDGES = [

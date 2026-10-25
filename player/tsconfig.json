@@ -14,9 +14,9 @@
     "types": ["node", "w3c-web-serial"],
     "baseUrl": ".",
     "paths": {
-      "@ht/*": ["../../ht-servo/src/*"],
+      "@ht/*": ["../ht-servo/src/*"],
       "serialport": ["../node_modules/serialport"]
     }
   },
-  "include": [".", "../../ht-servo/src/types"]
+  "include": [".", "../ht-servo/src/types"]
 }

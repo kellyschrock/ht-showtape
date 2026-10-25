@@ -18,11 +18,11 @@
     "types": ["vite/client", "w3c-web-serial"],
     "baseUrl": ".",
     "paths": {
-      "@ht/*": ["../ht-servo/src/*"],
+      "@ht/*": ["./ht-servo/src/*"],
       "react": ["./node_modules/@types/react"],
       "react/*": ["./node_modules/@types/react/*"],
       "zustand": ["./node_modules/zustand"]
     }
   },
-  "include": ["src", "vite.config.mts", "../ht-servo/src/types"]
+  "include": ["src", "vite.config.mts", "./ht-servo/src/types"]
 }

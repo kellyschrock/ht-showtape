@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 
 // The servo layers (protocol, transport, bus, connection and servo stores,
-// and the design system) come straight from the sibling ht-servo checkout
-// rather than a copy, so a protocol fix there lands here on the next build.
-const htServo = fileURLToPath(new URL('../ht-servo/src', import.meta.url))
+// and the design system) come straight from ht-servo's source, checked out
+// as a submodule at a pinned commit. Bumping the submodule brings in its fixes.
+const htServo = fileURLToPath(new URL('./ht-servo/src', import.meta.url))
 
 // base './' so the build loads from file:// inside the desktop shell.
 export default defineConfig({

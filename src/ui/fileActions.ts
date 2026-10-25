@@ -30,6 +30,27 @@ export async function openFile(): Promise<void> {
   if (await show.open()) resetTransport()
 }
 
+/** Opens a show the desktop handed over, asking about unsaved changes first. */
+async function openGiven(picked: { path: string; text: string }): Promise<void> {
+  const show = useShow.getState()
+  if (!(await show.confirmDiscard())) return
+  show.load(picked.text, picked.path)
+  if (useShow.getState().error == null) resetTransport()
+}
+
+/** Opens the show the app was started with, and any opened from the file manager later. */
+export function useLaunchFiles(): void {
+  useEffect(() => {
+    const bridge = window.showtape
+    if (!bridge) return
+    bridge.files.takeLaunchFile().then(
+      (picked) => picked && void openGiven(picked),
+      (error: unknown) => useShow.setState({ error: error instanceof Error ? error.message : String(error) })
+    )
+    return bridge.window.onOpenFile((picked) => void openGiven(picked))
+  }, [])
+}
+
 /** Keeps the window from closing over unsaved changes, in Electron and the browser. */
 export function useUnsavedGuard(): void {
   useEffect(() => {

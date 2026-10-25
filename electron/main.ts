@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { SerialLinkHost } from '../../ht-servo/electron/serial-link'
+import { SerialLinkHost } from '../ht-servo/electron/serial-link'
 
 // Bundled to CommonJS, so __dirname is the real one.
 const dirname = __dirname
@@ -274,13 +274,36 @@ async function chooseFile(kind: 'open' | 'save', defaultPath: string): Promise<s
   }
 }
 
-// Show files. The renderer never sees a path it did not get from a dialog.
-ipcMain.handle('show:open', async () => {
-  const file = await chooseFile('open', lastShowDir())
-  if (!file) return null
+async function readShow(file: string): Promise<{ path: string; text: string }> {
   const text = await readFile(file, 'utf8')
   rememberShowDir(file)
   return { path: file, text }
+}
+
+/**
+ * A show named on the command line: a file double-clicked in the file
+ * manager, or `showtape show.showtape`. In development the arguments
+ * start after `electron .`.
+ */
+function showFromArgs(argv: readonly string[], cwd: string): string | null {
+  const file = argv.slice(app.isPackaged ? 1 : 2).find((a) => !a.startsWith('-') && /\.(showtape|json)$/i.test(a))
+  return file ? path.resolve(cwd, file) : null
+}
+
+/** The show the app was started with, until the renderer takes it. */
+let launchFile = showFromArgs(process.argv, process.cwd())
+
+// Show files. The renderer never sees a path it did not get from a dialog
+// or from the command line.
+ipcMain.handle('show:open', async () => {
+  const file = await chooseFile('open', lastShowDir())
+  return file ? readShow(file) : null
+})
+
+ipcMain.handle('show:launch-file', () => {
+  const file = launchFile
+  launchFile = null
+  return file ? readShow(file) : null
 })
 
 ipcMain.handle(
@@ -306,7 +329,27 @@ ipcMain.on('show:dirty', (_event, dirty: boolean, name: string) => {
 })
 ipcMain.on('show:close', () => closeWindow())
 
+// Installed, one editor runs at a time: opening another show from the file
+// manager brings it to the open window, which asks about unsaved changes
+// first. Two editors would also fight over the adapter's port. Development
+// runs are left out, so a dev build can run beside the installed app.
+const primary = !app.isPackaged || app.requestSingleInstanceLock()
+if (!primary) app.quit()
+
+app.on('second-instance', (_event, argv, cwd) => {
+  if (!mainWindow) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.focus()
+  const file = showFromArgs(argv, cwd)
+  if (!file) return
+  readShow(file).then(
+    (picked) => mainWindow?.webContents.send('show:open-file', picked),
+    (error: unknown) => dialog.showErrorBox('Could not open the show', String(error)),
+  )
+})
+
 void app.whenReady().then(() => {
+  if (!primary) return
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

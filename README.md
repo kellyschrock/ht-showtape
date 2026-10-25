@@ -4,8 +4,9 @@ A show editor for Hitec CAN servos. Build a timeline of servo moves, as in
 an audio or video editor, then play it back to the servos in sync.
 
 Built as a desktop app with Electron. It drives the servos through a DPC-20
-or DPC-CAN adapter, using the protocol, transport and design system from the
-sibling [ht-servo](../ht-servo) checkout.
+or DPC-CAN adapter, using the protocol, transport and design system from
+[ht-servo](https://github.com/kellyschrock/ht-servo), checked out as a
+submodule in `ht-servo/`.
 
 ## State
 
@@ -21,7 +22,13 @@ sibling [ht-servo](../ht-servo) checkout.
 
 ## Getting started
 
-Requires Node 22 or newer, and `../ht-servo` checked out beside this repo.
+Requires Node 22 or newer. Clone with the submodule, or fetch it after:
+
+```bash
+git clone --recurse-submodules https://github.com/kellyschrock/ht-showtape.git
+git submodule update --init        # in a clone made without it
+```
+
 On Linux, the open and save dialogs use `zenity` (standard on Ubuntu)
 when it is installed, because Electron's own dialog treats Enter and
 double-click as Cancel.
@@ -107,11 +114,42 @@ npm install serialport@13
 
 `player/showtape-play.service` is a systemd unit to start it at boot.
 
+## Installing on Linux
+
+```bash
+npm run dist:linux                 # writes dist/showtape_<version>_amd64.deb
+sudo apt install ./dist/showtape_0.1.0_amd64.deb
+```
+
+It installs to `/opt/Showtape` with a `showtape` command and a menu entry,
+and opens `.showtape` files double-clicked in the file manager. With the app
+already open, they open in its window, which asks about unsaved changes
+first. zenity comes with it as a recommended package.
+
+To reach the adapter, the user must be in the `dialout` group:
+`sudo usermod -aG dialout $USER`, then log out and back in.
+
+## Updating ht-servo
+
+Showtape builds against the ht-servo commit the submodule is pinned to, not
+whatever is checked out elsewhere. To take in newer ht-servo work:
+
+```bash
+git -C ht-servo fetch && git -C ht-servo checkout <commit or branch>
+npm test && npm run typecheck
+git add ht-servo && git commit -m "Update ht-servo"
+```
+
+To try uncommitted ht-servo changes, make them in `ht-servo/` itself, or
+point its remote at a local checkout.
+
 ## How it fits together
 
 ```
 electron/        main process and preload. The serial host and the htservo
-                 bridge are ht-servo's own, imported from ../ht-servo
+                 bridge are ht-servo's own, imported from ht-servo/
+build/           the app icon, for packaging
+ht-servo/        the ht-servo submodule
 player/          showtape-play's command line and its serial link
 src/
   show/          the show document, curve sampling, limits, timecode. Pure
@@ -122,7 +160,7 @@ src/
   ui/            app bar, transport, timeline, inspector
 ```
 
-`@ht/*` resolves to `../ht-servo/src/*`, in both Vite and TypeScript.
+`@ht/*` resolves to `ht-servo/src/*`, in both Vite and TypeScript.
 
 ## Checks
 

@@ -15,7 +15,6 @@
     "baseUrl": ".",
     "paths": {
       "serialport": ["../node_modules/serialport"],
-      "koffi": ["../node_modules/koffi"],
       "electron": ["../node_modules/electron"]
     }
   },

@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "description": "Show editor that moves Hitec CAN servos in time with a timeline",
+  "author": "Kelly Schrock <kellyschrock@gmail.com>",
+  "homepage": "https://github.com/kellyschrock/ht-showtape",
   "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite",
@@ -10,6 +12,7 @@
     "build:web": "vite build",
     "build:electron": "node scripts/build-electron.mjs",
     "build:player": "node scripts/build-player.mjs",
+    "dist:linux": "npm run build:web && npm run build:electron && electron-builder --linux deb --publish never",
     "start": "npm run build:web && npm run build:electron && electron .",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit && tsc -p player/tsconfig.json --noEmit",
@@ -18,11 +21,7 @@
   },
   "license": "ISC",
   "dependencies": {
-    "koffi": "3.3.2",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "serialport": "^13.0.0",
-    "zustand": "^5.0.8"
+    "serialport": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -32,13 +31,56 @@
     "@types/w3c-web-serial": "^1.0.8",
     "@vitejs/plugin-react": "^6.1.1",
     "electron": "^44.4.3",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "jsdom": "^30.1.0",
     "prettier": "^3.9.8",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "zustand": "^5.0.16"
+  },
+  "build": {
+    "appId": "com.hitec.showtape",
+    "productName": "Showtape",
+    "npmRebuild": false,
+    "files": [
+      "dist-electron/*.cjs",
+      "dist-web/**/*",
+      "!dist-web/**/*.map",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "fileAssociations": [
+      {
+        "ext": "showtape",
+        "name": "Showtape show",
+        "description": "Showtape show",
+        "mimeType": "application/x-showtape",
+        "role": "Editor"
+      }
+    ],
+    "linux": {
+      "target": [
+        "deb"
+      ],
+      "executableName": "showtape",
+      "icon": "build/icon.png",
+      "category": "Development",
+      "synopsis": "Timeline editor for Hitec CAN servo shows",
+      "artifactName": "showtape_${version}_${arch}.${ext}"
+    },
+    "deb": {
+      "recommends": [
+        "zenity"
+      ]
+    }
   }
 }
