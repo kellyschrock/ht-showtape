@@ -396,6 +396,25 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
 // Timeline
 // ---------------------------------------------------------------------------
 
+/** Pixels per wheel line, for wheels that report lines rather than pixels. */
+const WHEEL_LINE_PX = 40
+
+/**
+ * Turns a plain wheel into a scroll along the timeline over the lanes, and
+ * through the channels over their headers. Shift swaps the two. Sideways
+ * input, from a trackpad or a tilting wheel, scrolls as it always has.
+ */
+function scroll(e: WheelEvent, el: HTMLElement, rect: DOMRect): void {
+  // Chromium hands Shift + wheel over as a sideways scroll already.
+  const amount = e.shiftKey && e.deltaY === 0 ? e.deltaX : e.deltaY
+  if (amount === 0 || (!e.shiftKey && e.deltaX !== 0)) return
+  e.preventDefault()
+  const px = amount * (e.deltaMode === WheelEvent.DOM_DELTA_LINE ? WHEEL_LINE_PX : e.deltaMode === WheelEvent.DOM_DELTA_PAGE ? el.clientHeight : 1)
+  const overHeaders = e.clientX - rect.left < HEADER_W
+  if (overHeaders !== e.shiftKey) el.scrollTop += px
+  else el.scrollLeft += px
+}
+
 export function Timeline() {
   const show = useShow((s) => s.show)
   const selection = useShow((s) => s.selection)
@@ -409,14 +428,17 @@ export function Timeline() {
   const grid = gridFor(show, zoom)
   const laneGrid = gridBackground(xOf(grid.major, zoom), xOf(grid.minor, zoom))
 
-  // Ctrl + wheel zooms about the pointer, keeping the time under it still.
+  // The wheel moves along the timeline over the lanes, and through the
+  // channels over their headers; Shift swaps the two. Ctrl + wheel zooms
+  // about the pointer, keeping the time under it still.
   useEffect(() => {
     const el = scroller.current
     if (!el) return
     function onWheel(e: WheelEvent) {
-      if (!(e.ctrlKey || e.metaKey) || !el) return
-      e.preventDefault()
+      if (!el) return
       const rect = el.getBoundingClientRect()
+      if (!(e.ctrlKey || e.metaKey)) return scroll(e, el, rect)
+      e.preventDefault()
       const px = e.clientX - rect.left - HEADER_W
       const { zoom: z, setZoom } = useTransport.getState()
       pendingAnchor.current = { ms: msOf(el.scrollLeft + px, z), px }

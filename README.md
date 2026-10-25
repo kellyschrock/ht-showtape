@@ -47,6 +47,9 @@ npm run dev                           # browser only, at the printed URL
   **Ctrl+Z** undoes, and **Ctrl+S** saves. **Ctrl+N** starts a new show and
   **Ctrl+O** opens one; both ask first if there are unsaved changes, and
   turn **Servos live** off.
+- The mouse wheel scrolls along the timeline over the lanes, and through
+  the channels over their names. **Shift** swaps the two, and **Ctrl**
+  zooms about the pointer.
 - A red band marks a move faster than the channel's **Max speed**, and a
   dashed line shows where the servo really goes there, since output never
   exceeds that speed. Select a key to see the speed into and out of it.
