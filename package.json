@@ -51,6 +51,7 @@
     "files": [
       "dist-electron/*.cjs",
       "dist-web/**/*",
+      "build/window-icon.png",
       "!dist-web/**/*.map",
       "package.json"
     ],

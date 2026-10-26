@@ -10,6 +10,14 @@ const dirname = __dirname
 
 const DEV_SERVER = process.env.VITE_DEV_SERVER_URL
 
+/**
+ * The windows' own icon, for the task switcher and title bar. An installed
+ * app also gets one from its desktop entry, but a development run has none.
+ * It is a 128 px copy of build/icon.svg: on X11, Electron silently drops a
+ * window icon of 256 px or more.
+ */
+const ICON = path.join(dirname, '..', 'build', 'window-icon.png')
+
 let mainWindow: BrowserWindow | null = null
 const links = new SerialLinkHost()
 
@@ -27,6 +35,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#131417',
     title: 'Showtape',
+    icon: ICON,
     webPreferences: {
       preload: path.join(dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -102,6 +111,7 @@ function allowMonitorWindow(parent: BrowserWindow): void {
         minWidth: 320,
         minHeight: 240,
         title: 'Monitor — Showtape',
+        icon: ICON,
         backgroundColor: '#131417',
         autoHideMenuBar: true,
         webPreferences: { backgroundThrottling: false },

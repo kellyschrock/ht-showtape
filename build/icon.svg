@@ -1,19 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Showtape's icon: a keyframed curve over a timeline, in the editor's colours. -->
-  <rect x="16" y="16" width="480" height="480" rx="96" fill="#131417"/>
-  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="#2a2d35" stroke-width="8"/>
-  <g stroke="#2a2d35" stroke-width="6">
-    <line x1="96" y1="112" x2="96" y2="400"/>
-    <line x1="208" y1="112" x2="208" y2="400"/>
-    <line x1="320" y1="112" x2="320" y2="400"/>
-    <line x1="432" y1="112" x2="432" y2="400"/>
+  <!-- Showtape's icon: a cassette, after the tapes that once carried an
+       animatronic show's audio and control tracks together. A keyframed
+       curve runs along its label, and its reels are servo horns. -->
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f8bf0"/><stop offset="1" stop-color="#3c54b4"/></linearGradient></defs><rect x="16" y="16" width="480" height="480" rx="100" fill="url(#bg)"/>
+  <!-- cassette shell -->
+  <rect x="48" y="112" width="416" height="296" rx="30" fill="#2c3039" stroke="#40454f" stroke-width="6"/>
+  <g fill="#131417"><circle cx="76" cy="140" r="7"/><circle cx="436" cy="140" r="7"/><circle cx="76" cy="380" r="7"/><circle cx="436" cy="380" r="7"/></g>
+  <!-- label -->
+  <rect x="80" y="138" width="352" height="196" rx="16" fill="#f2ead8"/>
+  <path d="M96 138 H416 A16 16 0 0 1 432 154 V170 H80 V154 A16 16 0 0 1 96 138 Z" fill="#ff5c6b"/>
+  <!-- the show: a keyframed curve along the label -->
+  <path d="M104 214 C 140 214, 150 184, 186 184 S 236 222, 266 222 S 316 186, 346 186 S 392 210, 408 210" fill="none" stroke="#5b76d9" stroke-width="12" stroke-linecap="round"/>
+  <g fill="#e0ba78" stroke="#f2ead8" stroke-width="3"><circle cx="186" cy="184" r="8"/><circle cx="266" cy="222" r="8"/><circle cx="346" cy="186" r="8"/></g>
+  <!-- tape window -->
+  <rect x="136" y="238" width="240" height="80" rx="40" fill="#131417"/>
+  <rect x="226" y="262" width="60" height="32" rx="4" fill="#3b2a22"/>
+  <!-- reels, as servo horns on their splines -->
+  <g transform="translate(180 278)">
+    <circle r="31" fill="#4a3428"/>
+    <g fill="#f2ead8"><rect x="-6" y="-27" width="12" height="54" rx="6"/><rect x="-27" y="-6" width="54" height="12" rx="6"/></g>
+    <circle r="9" fill="#5b76d9"/>
   </g>
-  <path d="M72 352 C 136 352, 136 168, 200 168 S 264 312, 312 312 S 392 136, 440 136" fill="none" stroke="#5b76d9" stroke-width="26" stroke-linecap="round"/>
-  <g fill="#e0ba78" stroke="#131417" stroke-width="8">
-    <circle cx="72" cy="352" r="22"/>
-    <circle cx="200" cy="168" r="22"/>
-    <circle cx="312" cy="312" r="22"/>
-    <circle cx="440" cy="136" r="22"/>
+  <g transform="translate(332 278) rotate(30)">
+    <circle r="31" fill="#4a3428"/>
+    <g fill="#f2ead8"><rect x="-6" y="-27" width="12" height="54" rx="6"/><rect x="-27" y="-6" width="54" height="12" rx="6"/></g>
+    <circle r="9" fill="#5b76d9"/>
   </g>
-  <line x1="256" y1="84" x2="256" y2="428" stroke="#ff5c6b" stroke-width="10" stroke-linecap="round"/>
+  <!-- bottom edge, where the heads meet the tape -->
+  <path d="M138 408 L158 352 H354 L374 408 Z" fill="#23262e" stroke="#40454f" stroke-width="6" stroke-linejoin="round"/>
+  <g fill="#131417"><circle cx="196" cy="384" r="9"/><circle cx="316" cy="384" r="9"/><rect x="240" y="372" width="32" height="20" rx="4"/></g>
 </svg>

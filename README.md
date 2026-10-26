@@ -148,7 +148,7 @@ point its remote at a local checkout.
 ```
 electron/        main process and preload. The serial host and the htservo
                  bridge are ht-servo's own, imported from ht-servo/
-build/           the app icon, for packaging
+build/           the app icon (icon.svg), and the PNGs made from it
 ht-servo/        the ht-servo submodule
 player/          showtape-play's command line and its serial link
 src/
