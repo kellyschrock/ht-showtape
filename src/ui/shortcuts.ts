@@ -81,7 +81,7 @@ export function useShortcuts(view: Window = window): void {
           break
         case 'Delete':
         case 'Backspace':
-          show.deleteSelectedKeys()
+          show.deleteSelection()
           break
         case 'k':
         case 'K':
@@ -91,7 +91,10 @@ export function useShortcuts(view: Window = window): void {
         case 'ArrowRight': {
           e.preventDefault()
           const dir = e.key === 'ArrowLeft' ? -1 : 1
-          if (channel && keyIds.length) {
+          const cue = show.show.cues.find((c) => c.id === show.selection.cueId)
+          if (cue) {
+            show.updateCue(cue.id, { t: cue.t + dir * step }, 'nudge')
+          } else if (channel && keyIds.length) {
             const moves = channel.keys.filter((k) => keyIds.includes(k.id))
             show.edit((s) => ({
               ...s,

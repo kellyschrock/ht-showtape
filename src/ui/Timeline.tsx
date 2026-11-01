@@ -9,14 +9,17 @@ import {
   type RefObject,
 } from 'react'
 import { protocolLabel } from '@ht/protocol'
-import { effectiveProtocol, sortKeys, type Channel, type Keyframe, type Show } from '../show/model'
+import { effectiveProtocol, sortKeys, type Channel, type Cue, type Keyframe, type Show } from '../show/model'
+import { cueOfKey, poseValue, resolveShow } from '../show/poses'
 import { clamp, followChannel, roundDegrees, sampleChannel, tooFastSegments } from '../show/sample'
 import { snap as snapTo, snapStep } from '../show/timecode'
-import { mapChannel, useShow } from '../stores/show'
+import { usePoses } from '../stores/poses'
+import { mapChannel, mapCue, useShow } from '../stores/show'
 import { useTransport } from '../stores/transport'
 
 /**
- * The timeline: a ruler, then one lane per channel with its curve and keys.
+ * The timeline: a ruler, the poses placed on it, then one lane per channel
+ * with its curve and keys.
  *
  * Everything scrolls together. The track headers stick to the left and the
  * ruler to the top, as in an audio editor. Times become pixels through the
@@ -27,6 +30,7 @@ import { useTransport } from '../stores/transport'
 const HEADER_W = 220
 const LANE_H = 92
 const RULER_H = 30
+const CUE_H = 28
 const PAD = 10
 
 function xOf(ms: number, zoom: number): number {
@@ -141,12 +145,23 @@ function Playhead({ zoom, scroller }: { zoom: number; scroller: RefObject<HTMLDi
 // Track header
 // ---------------------------------------------------------------------------
 
+/** `channel` is the resolved one, poses included, so this reads what the servo is sent. */
 function LiveValue({ channel }: { channel: Channel }) {
   const t = useTransport((s) => s.positionMs)
+  // While a pose is being shaped, the figure holds it instead of the timeline.
+  const held = usePoses((s) => (s.posing ? s.poses.find((p) => p.id === s.editingId) : undefined))
+  const v = held ? poseValue(held, channel) : undefined
+  if (v != null) {
+    return (
+      <span className="st-track__value st-track__value--held" title={`Holding “${held!.name}”`}>
+        {clamp(v, channel.min, channel.max).toFixed(1)}°
+      </span>
+    )
+  }
   return <span className="st-track__value">{sampleChannel(channel, t).toFixed(1)}°</span>
 }
 
-function TrackHeader({ channel, show, selected }: { channel: Channel; show: Show; selected: boolean }) {
+function TrackHeader({ channel, curve, show, selected }: { channel: Channel; curve: Channel; show: Show; selected: boolean }) {
   const select = useShow((s) => s.select)
   const updateChannel = useShow((s) => s.updateChannel)
   const protocol = effectiveProtocol(show, channel)
@@ -187,7 +202,7 @@ function TrackHeader({ channel, show, selected }: { channel: Channel; show: Show
         >
           S
         </button>
-        <LiveValue channel={channel} />
+        <LiveValue channel={curve} />
       </div>
     </div>
   )
@@ -256,7 +271,28 @@ interface Drag {
   started: boolean
 }
 
-function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show: Show; width: number; zoom: number; selected: string[] }) {
+/**
+ * One channel's lane. `channel` is the channel as stored, whose keys are the
+ * ones to edit; `curve` is the same channel with its poses' keys added,
+ * which is what gets drawn and played.
+ */
+function Lane({
+  channel,
+  curve,
+  show,
+  width,
+  zoom,
+  selected,
+  cueId,
+}: {
+  channel: Channel
+  curve: Channel
+  show: Show
+  width: number
+  zoom: number
+  selected: string[]
+  cueId: string | null
+}) {
   const select = useShow((s) => s.select)
   const addKey = useShow((s) => s.addKey)
   const snapOn = useTransport((s) => s.snap)
@@ -270,11 +306,14 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
   const vOf = (py: number) => clamp(channel.max - ((py - PAD) / inner) * range, channel.min, channel.max)
   const step = snapStep(show.source.fps, show.source.bpm)
 
-  const path = curvePath(channel, width, x, y)
+  const path = curvePath(curve, width, x, y)
   const stepMs = 1000 / show.outputHz
-  const follow = useMemo(() => followChannel(channel, show.source.durationMs, stepMs), [channel, show.source.durationMs, stepMs])
-  const lag = lagPath(channel, follow, stepMs, x, y)
-  const fast = tooFastSegments(channel)
+  const follow = useMemo(() => followChannel(curve, show.source.durationMs, stepMs), [curve, show.source.durationMs, stepMs])
+  const lag = lagPath(curve, follow, stepMs, x, y)
+  const fast = tooFastSegments(curve)
+  // Keys a pose's hold has set aside: still there to drag clear, but not played.
+  const drawn = new Set(curve.keys.map((k) => k.id))
+  const setAside = channel.keys.filter((k) => !drawn.has(k.id))
 
   function local(e: { clientX: number; clientY: number }): { px: number; py: number } {
     const rect = svg.current!.getBoundingClientRect()
@@ -296,6 +335,15 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
     svg.current!.setPointerCapture(e.pointerId)
     drag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, anchor: key, origin, started: false }
     // Paused, the playhead jumps to the key, so a live servo shows the pose.
+    if (!useTransport.getState().playing) useTransport.getState().seek(key.t)
+  }
+
+  /** A pose's key is the cue's to move: clicking one picks the cue. */
+  function onPoseKeyDown(e: ReactPointerEvent, key: Keyframe) {
+    e.stopPropagation()
+    const id = cueOfKey(key.id)
+    if (e.button !== 0 || !id) return
+    select({ channelId: channel.id, cueId: id })
     if (!useTransport.getState().playing) useTransport.getState().seek(key.t)
   }
 
@@ -359,8 +407,8 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
     >
       {zero != null ? <line className="st-lane__zero" x1={0} x2={width} y1={zero} y2={zero} /> : null}
       {[...fast].map(([i, speed]) => {
-        const a = channel.keys[i]!
-        const b = channel.keys[i + 1]!
+        const a = curve.keys[i]!
+        const b = curve.keys[i + 1]!
         return (
           <path key={a.id} className="st-lane__fast" d={`M${x(a.t)},${y(a.v)}${segmentPath(a, b, x, y)}`}>
             <title>
@@ -371,12 +419,23 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
       })}
       <path className="st-lane__curve" d={path} style={{ stroke: channel.color }} />
       {lag ? <path className="st-lane__follow" d={lag} style={{ stroke: channel.color }} /> : null}
-      {channel.keys.map((k) => {
-        const on = selected.includes(k.id)
+      {[...setAside, ...curve.keys].map((k) => {
         const cx = x(k.t)
         const cy = y(k.v)
+        const cue = cueOfKey(k.id)
+        const aside = !drawn.has(k.id)
+        if (cue) {
+          return (
+            <g key={k.id} className={`st-key st-key--pose${cue === cueId ? ' st-key--on' : ''}`} onPointerDown={(e) => onPoseKeyDown(e, k)}>
+              <circle className="st-key__hit" cx={cx} cy={cy} r={9} />
+              <path className="st-key__mark" d={`M${cx},${cy - 6}L${cx + 5},${cy}L${cx},${cy + 6}L${cx - 5},${cy}Z`} />
+            </g>
+          )
+        }
+        const on = selected.includes(k.id)
         return (
-          <g key={k.id} className={`st-key${on ? ' st-key--on' : ''}`} onPointerDown={(e) => onKeyDown(e, k)}>
+          <g key={k.id} className={`st-key${on ? ' st-key--on' : ''}${aside ? ' st-key--aside' : ''}`} onPointerDown={(e) => onKeyDown(e, k)}>
+            {aside ? <title>Held over by a pose, so not played. Drag it clear of the hold to use it again.</title> : null}
             <circle className="st-key__hit" cx={cx} cy={cy} r={9} />
             {k.ease === 'step' ? (
               <rect className="st-key__mark" x={cx - 4.5} y={cy - 4.5} width={9} height={9} style={{ stroke: channel.color }} />
@@ -389,6 +448,103 @@ function Lane({ channel, show, width, zoom, selected }: { channel: Channel; show
         )
       })}
     </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Poses on the timeline
+// ---------------------------------------------------------------------------
+
+interface CueDrag {
+  pointerId: number
+  id: string
+  startX: number
+  origin: number
+  started: boolean
+}
+
+/**
+ * The cues: one chip per pose placed on the timeline, as long as its hold.
+ * Drag one to move it; double-click the lane to place the pose open in the
+ * Poses panel.
+ */
+function CueLane({ show, width, zoom, selected }: { show: Show; width: number; zoom: number; selected: string | null }) {
+  const select = useShow((s) => s.select)
+  const snapOn = useTransport((s) => s.snap)
+  const editingId = usePoses((s) => s.editingId)
+  const drag = useRef<CueDrag | null>(null)
+  const lane = useRef<HTMLDivElement>(null)
+  const step = snapStep(show.source.fps, show.source.bpm)
+  const names = new Map(show.poses.map((p) => [p.id, p.name]))
+
+  function seekPaused(t: number) {
+    if (!useTransport.getState().playing) useTransport.getState().seek(t)
+  }
+
+  function onCueDown(e: ReactPointerEvent, cue: Cue) {
+    e.stopPropagation()
+    if (e.button !== 0) return
+    select({ cueId: cue.id })
+    lane.current!.setPointerCapture(e.pointerId)
+    drag.current = { pointerId: e.pointerId, id: cue.id, startX: e.clientX, origin: cue.t, started: false }
+    // Paused, the playhead jumps to the cue, so a live figure shows the pose.
+    seekPaused(cue.t)
+  }
+
+  function onMove(e: ReactPointerEvent) {
+    const d = drag.current
+    if (!d || d.pointerId !== e.pointerId) return
+    const dx = e.clientX - d.startX
+    if (!d.started) {
+      if (Math.abs(dx) < 3) return
+      d.started = true
+      useShow.getState().begin()
+    }
+    let t = Math.max(0, d.origin + msOf(dx, zoom))
+    if (snapOn && !e.altKey) t = snapTo(t, step)
+    useShow.getState().live((s) => mapCue(s, d.id, (c) => ({ ...c, t: Math.round(t) })))
+    seekPaused(t)
+  }
+
+  function onUp(e: ReactPointerEvent) {
+    if (drag.current?.pointerId === e.pointerId) drag.current = null
+  }
+
+  return (
+    <div
+      ref={lane}
+      className="st-cues"
+      style={{ width }}
+      title={editingId ? 'Double-click to place the pose open in the Poses panel' : 'Open a pose in the Poses panel, then double-click here to place it'}
+      onPointerDown={(e) => {
+        if (e.button === 0) select({ cueId: null })
+      }}
+      onDoubleClick={(e) => {
+        if (!editingId) return
+        let t = msOf(e.clientX - e.currentTarget.getBoundingClientRect().left, zoom)
+        if (snapOn && !e.altKey) t = snapTo(t, step)
+        useShow.getState().addCue(editingId, t)
+      }}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
+      {show.cues.map((cue) => {
+        const name = names.get(cue.poseId)
+        return (
+          <div
+            key={cue.id}
+            className={`st-cue${cue.id === selected ? ' st-cue--on' : ''}${name == null ? ' st-cue--missing' : ''}`}
+            style={{ left: xOf(cue.t, zoom), minWidth: xOf(cue.holdMs, zoom) }}
+            title={name == null ? 'This pose is missing from the library and the show' : `${name}${cue.holdMs ? `, held ${cue.holdMs / 1000}s` : ''}`}
+            onPointerDown={(e) => onCueDown(e, cue)}
+            onDoubleClick={(e) => e.stopPropagation()}
+          >
+            {name ?? 'Missing pose'}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -424,6 +580,7 @@ export function Timeline() {
   const pendingAnchor = useRef<{ ms: number; px: number } | null>(null)
   const [, force] = useState(0)
 
+  const resolved = resolveShow(show)
   const width = Math.ceil(xOf(show.source.durationMs, zoom)) + 1
   const grid = gridFor(show, zoom)
   const laneGrid = gridBackground(xOf(grid.major, zoom), xOf(grid.minor, zoom))
@@ -460,24 +617,34 @@ export function Timeline() {
   return (
     <section className="st-timeline" ref={scroller}>
       <div className="st-timeline__inner" style={{ width: HEADER_W + width }}>
-        <div className="st-timeline__top" style={{ height: RULER_H }}>
-          <div className="st-corner" style={{ width: HEADER_W }}>
-            <button type="button" className="ht-btn ht-btn--sm ht-btn--ghost" onClick={() => addChannel()}>
-              + Channel
-            </button>
+        <div className="st-timeline__top">
+          <div className="st-timeline__row" style={{ height: RULER_H }}>
+            <div className="st-corner" style={{ width: HEADER_W }}>
+              <button type="button" className="ht-btn ht-btn--sm ht-btn--ghost" onClick={() => addChannel()}>
+                + Channel
+              </button>
+            </div>
+            <Ruler width={width} show={show} zoom={zoom} />
           </div>
-          <Ruler width={width} show={show} zoom={zoom} />
+          <div className="st-timeline__row st-timeline__row--cues" style={{ height: CUE_H }}>
+            <div className="st-corner st-corner--label" style={{ width: HEADER_W }}>
+              Poses
+            </div>
+            <CueLane show={show} width={width} zoom={zoom} selected={selection.cueId} />
+          </div>
         </div>
 
-        {show.channels.map((c) => (
+        {show.channels.map((c, i) => (
           <div key={c.id} className={`st-track${c.mute ? ' st-track--muted' : ''}`}>
-            <TrackHeader channel={c} show={show} selected={selection.channelId === c.id} />
+            <TrackHeader channel={c} curve={resolved.channels[i]!} show={show} selected={selection.channelId === c.id} />
             <div
               className={`st-track__lane${selection.channelId === c.id ? ' st-track__lane--on' : ''}`}
               style={laneGrid}
             >
               <Lane
                 channel={c}
+                curve={resolved.channels[i]!}
+                cueId={selection.cueId}
                 show={show}
                 width={width}
                 zoom={zoom}

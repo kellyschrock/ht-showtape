@@ -9,6 +9,12 @@ export interface ShowtapeBridge {
     /** The show the app was started with, once; null after that or if there was none. */
     takeLaunchFile(): Promise<{ path: string; text: string } | null>
   }
+  poses: {
+    /** The pose library file's text, or null when there is none yet. */
+    load(): Promise<string | null>
+    /** Replaces the pose library file. Written as it arrives, so a save just before closing still lands. */
+    save(text: string): void
+  }
   window: {
     /** Tells the main process whether closing the window would lose changes. */
     setDirty(dirty: boolean, name: string): void

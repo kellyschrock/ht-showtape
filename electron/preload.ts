@@ -1,6 +1,7 @@
 /**
  * The privileged surface: ht-servo's serial bridge, unchanged, as
- * window.htservo, plus show file open and save as window.showtape.
+ * window.htservo, plus show file open and save, and the pose library, as
+ * window.showtape.
  *
  * src/types/showtape.d.ts mirrors the second object. Change them together.
  */
@@ -14,6 +15,10 @@ contextBridge.exposeInMainWorld('showtape', {
     save: (request: { text: string; path: string | null; name: string }) => ipcRenderer.invoke('show:save', request),
     askSave: (name: string) => ipcRenderer.invoke('show:ask-save', name),
     takeLaunchFile: () => ipcRenderer.invoke('show:launch-file'),
+  },
+  poses: {
+    load: () => ipcRenderer.invoke('poses:load'),
+    save: (text: string) => ipcRenderer.send('poses:save', text),
   },
   window: {
     setDirty: (dirty: boolean, name: string) => ipcRenderer.send('show:dirty', dirty, name),

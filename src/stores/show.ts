@@ -6,13 +6,17 @@ import {
   newShow,
   parseShow,
   serializeShow,
+  sortCues,
   sortKeys,
   type Channel,
+  type Cue,
   type Ease,
   type Keyframe,
   type Show,
 } from '../show/model'
+import { resolveShow, syncPoses } from '../show/poses'
 import { clamp, roundDegrees, sampleChannel } from '../show/sample'
+import { usePoses } from './poses'
 
 /**
  * The open show, its undo history, the selection, and the file it came from.
@@ -29,6 +33,8 @@ const COALESCE_MS = 800
 export interface Selection {
   channelId: string | null
   keyIds: string[]
+  /** A selected cue; selecting keys clears it, and selecting it clears the keys. */
+  cueId: string | null
 }
 
 interface ShowState {
@@ -58,6 +64,12 @@ interface ShowState {
   updateKeys(channelId: string, ids: readonly string[], patch: Partial<Pick<Keyframe, 'v' | 't' | 'ease'>>): void
   deleteSelectedKeys(): void
   selectAllKeys(): void
+  /** Places a pose on the timeline and selects the cue. */
+  addCue(poseId: string, t: number): void
+  updateCue(id: string, patch: Partial<Omit<Cue, 'id'>>, coalesce?: string): void
+  removeCues(ids: readonly string[]): void
+  /** Deletes the selected cue, or else the selected keys. */
+  deleteSelection(): void
 
   newShow(): void
   load(text: string, path: string | null): void
@@ -70,6 +82,10 @@ interface ShowState {
    */
   confirmDiscard(): Promise<boolean>
   clearError(): void
+}
+
+export function mapCue(show: Show, id: string, fn: (c: Cue) => Cue): Show {
+  return { ...show, cues: sortCues(show.cues.map((c) => (c.id === id ? fn(c) : c))) }
 }
 
 export function mapChannel(show: Show, id: string, fn: (c: Channel) => Channel): Show {
@@ -108,17 +124,33 @@ export const useShow = create<ShowState>((set, get) => {
     set({ past: next.length > HISTORY_LIMIT ? next.slice(-HISTORY_LIMIT) : next, future: [] })
   }
 
-  /** Drops a selection that points at channels or keys that no longer exist. */
+  /** Drops a selection that points at channels, keys or cues that no longer exist. */
   function tidy(show: Show, selection: Selection): Selection {
+    const cueId = show.cues.some((c) => c.id === selection.cueId) ? selection.cueId : null
     const channel = show.channels.find((c) => c.id === selection.channelId)
-    if (!channel) return { channelId: show.channels[0]?.id ?? null, keyIds: [] }
+    if (!channel) return { channelId: show.channels[0]?.id ?? null, keyIds: [], cueId }
     const ids = new Set(channel.keys.map((k) => k.id))
-    return { channelId: channel.id, keyIds: selection.keyIds.filter((id) => ids.has(id)) }
+    return { channelId: channel.id, keyIds: selection.keyIds.filter((id) => ids.has(id)), cueId }
+  }
+
+  /** The show with its pose copies taken from the library, which always has the last word. */
+  function synced(show: Show): Show {
+    return syncPoses(show, usePoses.getState().poses)
   }
 
   function replace(show: Show): void {
-    set({ show, dirty: true, selection: tidy(show, get().selection) })
+    const next = synced(show)
+    set({ show: next, dirty: true, selection: tidy(next, get().selection) })
   }
+
+  // A pose changed in the library changes every cue that uses it, and the
+  // copy the show file keeps, so the show has unsaved changes.
+  usePoses.subscribe((state, prev) => {
+    if (state.poses === prev.poses) return
+    const { show } = get()
+    const next = synced(show)
+    if (next !== show) set({ show: next, dirty: true })
+  })
 
   const initial = newShow()
 
@@ -129,7 +161,7 @@ export const useShow = create<ShowState>((set, get) => {
     error: null,
     past: [],
     future: [],
-    selection: { channelId: initial.channels[0]!.id, keyIds: [] },
+    selection: { channelId: initial.channels[0]!.id, keyIds: [], cueId: null },
 
     edit(fn, coalesce) {
       const now = Date.now()
@@ -153,8 +185,9 @@ export const useShow = create<ShowState>((set, get) => {
       const prev = past.at(-1)
       if (!prev) return
       lastCoalesce = null
-      set({ past: past.slice(0, -1), future: [show, ...future], show: prev, dirty: true })
-      set({ selection: tidy(prev, get().selection) })
+      const back = synced(prev)
+      set({ past: past.slice(0, -1), future: [show, ...future], show: back, dirty: true })
+      set({ selection: tidy(back, get().selection) })
     },
 
     redo() {
@@ -162,19 +195,21 @@ export const useShow = create<ShowState>((set, get) => {
       const next = future[0]
       if (!next) return
       lastCoalesce = null
-      set({ past: [...past, show], future: future.slice(1), show: next, dirty: true })
-      set({ selection: tidy(next, get().selection) })
+      const forward = synced(next)
+      set({ past: [...past, show], future: future.slice(1), show: forward, dirty: true })
+      set({ selection: tidy(forward, get().selection) })
     },
 
     select(selection) {
-      set({ selection: { ...get().selection, ...selection } })
+      // Picking anything but a cue lets go of the cue; picking a cue lets go of the keys.
+      set({ selection: { ...get().selection, cueId: null, ...selection, ...(selection.cueId ? { keyIds: [] } : {}) } })
     },
 
     addChannel(servo, name) {
       const index = get().show.channels.length
       const channel = { ...newChannel(index, servo), ...(name ? { name } : {}) }
       get().edit((s) => ({ ...s, channels: [...s.channels, channel] }))
-      set({ selection: { channelId: channel.id, keyIds: [] } })
+      set({ selection: { channelId: channel.id, keyIds: [], cueId: null } })
     },
 
     duplicateChannel(id) {
@@ -183,7 +218,7 @@ export const useShow = create<ShowState>((set, get) => {
       if (!copy) return
       const at = show.channels.findIndex((c) => c.id === id) + 1
       get().edit((s) => ({ ...s, channels: [...s.channels.slice(0, at), copy, ...s.channels.slice(at)] }))
-      set({ selection: { channelId: copy.id, keyIds: [] } })
+      set({ selection: { channelId: copy.id, keyIds: [], cueId: null } })
     },
 
     removeChannel(id) {
@@ -208,7 +243,8 @@ export const useShow = create<ShowState>((set, get) => {
     },
 
     addKey(channelId, t, v) {
-      const channel = get().show.channels.find((c) => c.id === channelId)
+      // Starts on the curve as drawn, poses included.
+      const channel = resolveShow(get().show).channels.find((c) => c.id === channelId)
       if (!channel) return
       const key: Keyframe = {
         id: newId('k'),
@@ -217,7 +253,7 @@ export const useShow = create<ShowState>((set, get) => {
         ease: 'smooth',
       }
       get().edit((s) => mapChannel(s, channelId, (c) => ({ ...c, keys: sortKeys([...c.keys, key]) })))
-      set({ selection: { channelId, keyIds: [key.id] } })
+      set({ selection: { channelId, keyIds: [key.id], cueId: null } })
     },
 
     updateKeys(channelId, ids, patch) {
@@ -253,7 +289,38 @@ export const useShow = create<ShowState>((set, get) => {
     selectAllKeys() {
       const { channelId } = get().selection
       const channel = get().show.channels.find((c) => c.id === channelId)
-      if (channel) set({ selection: { channelId: channel.id, keyIds: channel.keys.map((k) => k.id) } })
+      if (channel) set({ selection: { channelId: channel.id, keyIds: channel.keys.map((k) => k.id), cueId: null } })
+    },
+
+    addCue(poseId, t) {
+      const cue: Cue = { id: newId('q'), t: Math.max(0, Math.round(t)), poseId, holdMs: 0, ease: 'smooth' }
+      get().edit((s) => ({ ...s, cues: sortCues([...s.cues, cue]) }))
+      set({ selection: { ...get().selection, keyIds: [], cueId: cue.id } })
+    },
+
+    updateCue(id, patch, coalesce) {
+      get().edit(
+        (s) =>
+          mapCue(s, id, (c) => ({
+            ...c,
+            ...patch,
+            t: Math.max(0, Math.round(patch.t ?? c.t)),
+            holdMs: Math.max(0, Math.round(patch.holdMs ?? c.holdMs)),
+          })),
+        coalesce ? `cue:${id}:${coalesce}` : undefined
+      )
+    },
+
+    removeCues(ids) {
+      if (ids.length === 0) return
+      const gone = new Set(ids)
+      get().edit((s) => ({ ...s, cues: s.cues.filter((c) => !gone.has(c.id)) }))
+    },
+
+    deleteSelection() {
+      const { cueId } = get().selection
+      if (cueId) get().removeCues([cueId])
+      else get().deleteSelectedKeys()
     },
 
     newShow() {
@@ -265,13 +332,16 @@ export const useShow = create<ShowState>((set, get) => {
         past: [],
         future: [],
         error: null,
-        selection: { channelId: show.channels[0]!.id, keyIds: [] },
+        selection: { channelId: show.channels[0]!.id, keyIds: [], cueId: null },
       })
     },
 
     load(text, path) {
       try {
-        const show = parseShow(JSON.parse(text))
+        const parsed = parseShow(JSON.parse(text))
+        // Its poses join the library, and the library's own versions of them win.
+        usePoses.getState().adopt(parsed.poses)
+        const show = synced(parsed)
         set({
           show,
           path,
@@ -279,7 +349,7 @@ export const useShow = create<ShowState>((set, get) => {
           past: [],
           future: [],
           error: null,
-          selection: { channelId: show.channels[0]?.id ?? null, keyIds: [] },
+          selection: { channelId: show.channels[0]?.id ?? null, keyIds: [], cueId: null },
         })
       } catch (error) {
         set({ error: error instanceof Error ? error.message : String(error) })

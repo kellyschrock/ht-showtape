@@ -71,6 +71,34 @@ npm run dev                           # browser only, at the printed URL
 - **Servos live** sends the show to the servos. It keeps sending while
   paused, so scrubbing or dragging a key moves the real figure.
 
+## Poses
+
+A pose is a named position for some of the figure's servos, like "Arms
+out". Poses live in a library outside any show, so every show for the
+figure can use them.
+
+- **Poses** tab, **New pose**: starts from every channel at the playhead.
+  Untick the servos the pose should leave alone.
+- **Hold this pose** sends the pose to the figure instead of the timeline,
+  so each slider moves its servo, within its limits and max speed. Leaving
+  the tab, or pressing play, hands the figure back to the timeline.
+- **Place at playhead**, or double-click the Poses lane under the ruler,
+  puts the open pose on the timeline as a cue. Drag a cue to move it, or
+  select it to set a **Hold**, how long the figure stays in the pose. The
+  arrow keys nudge it and Delete removes it.
+- A cue refers to its pose, so changing the pose changes every cue that
+  uses it. Its keys show gold on the lanes; click one to pick the cue.
+  Hand-drawn keys inside a hold are set aside, drawn faded, until the cue
+  moves off them.
+- Servos are matched by channel name, so keep a joint's name the same in
+  every show.
+
+The library is `poses.json` in the app's settings folder
+(on Linux, `~/.config/Showtape` installed, `~/.config/hitec-showtape` run from
+source). A show file keeps a copy of each pose it uses, so it plays on its
+own in `showtape-play`. Opening a show adds poses the library lacks, and
+where the library has a pose, its version wins.
+
 ## Protocols
 
 Each channel's protocol is either **Show default**, set on the Show tab, or
@@ -156,7 +184,7 @@ src/
   clock/         timeline clocks. The time source today, audio/MIDI/SMPTE next
   playback/      ServoOutput: samples the show and writes positions to the bus
   player/        Player: homes, plays, loops and rests, for showtape-play
-  stores/        the open show (with undo) and the transport
+  stores/        the open show (with undo), the pose library, the transport
   ui/            app bar, transport, timeline, inspector
 ```
 

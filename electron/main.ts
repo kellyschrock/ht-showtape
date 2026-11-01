@@ -332,6 +332,27 @@ ipcMain.handle(
   },
 )
 
+// The pose library, one file for every show. Written synchronously, as the
+// settings are, so the last change before quitting is not cut off.
+const POSES_FILE = path.join(app.getPath('userData'), 'poses.json')
+
+ipcMain.handle('poses:load', () => {
+  try {
+    return readFileSync(POSES_FILE, 'utf8')
+  } catch {
+    return null
+  }
+})
+
+ipcMain.on('poses:save', (_event, text: string) => {
+  try {
+    mkdirSync(path.dirname(POSES_FILE), { recursive: true })
+    writeFileSync(POSES_FILE, String(text), 'utf8')
+  } catch (error) {
+    console.error(`Could not save the pose library to ${POSES_FILE}:`, error)
+  }
+})
+
 ipcMain.handle('show:ask-save', (_event, name: string) => askSave(String(name)))
 ipcMain.on('show:dirty', (_event, dirty: boolean, name: string) => {
   showDirty = dirty === true

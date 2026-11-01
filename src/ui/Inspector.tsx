@@ -1,17 +1,20 @@
 import { PROTOCOLS, SPEEDS, protocolLabel, type Protocol } from '@ht/protocol'
-import { SOURCES, type Channel, type ChannelProtocol, type FrameRate } from '../show/model'
+import { SOURCES, type Channel, type ChannelProtocol, type Ease, type FrameRate } from '../show/model'
 import { segmentSpeed, tooFastSegments } from '../show/sample'
 import { formatSeconds, parseSeconds } from '../show/timecode'
 import { EASES, useSelectedChannel, useShow } from '../stores/show'
+import { usePoses } from '../stores/poses'
 import { useTransport } from '../stores/transport'
 import { Field, NumberField, Section } from './fields'
 import { MonitorPanel } from './MonitorPanel'
+import { PosesPanel } from './PosesPanel'
 import { ServosPanel } from './ServosPanel'
 
-export type InspectorTab = 'selection' | 'show' | 'servos' | 'monitor'
+export type InspectorTab = 'selection' | 'poses' | 'show' | 'servos' | 'monitor'
 
 const TABS: ReadonlyArray<{ id: InspectorTab; label: string }> = [
   { id: 'selection', label: 'Channel' },
+  { id: 'poses', label: 'Poses' },
   { id: 'show', label: 'Show' },
   { id: 'servos', label: 'Servos' },
   { id: 'monitor', label: 'Monitor' },
@@ -19,6 +22,7 @@ const TABS: ReadonlyArray<{ id: InspectorTab; label: string }> = [
 
 export function Inspector({ tab, onTab }: { tab: InspectorTab; onTab(tab: InspectorTab): void }) {
   const error = useShow((s) => s.error)
+  const cueSelected = useShow((s) => s.selection.cueId != null)
   return (
     <aside className="st-inspector">
       <nav className="st-tabs" role="tablist">
@@ -31,7 +35,7 @@ export function Inspector({ tab, onTab }: { tab: InspectorTab; onTab(tab: Inspec
             className={`st-tab${tab === t.id ? ' st-tab--on' : ''}`}
             onClick={() => onTab(t.id)}
           >
-            {t.label}
+            {t.id === 'selection' && cueSelected ? 'Cue' : t.label}
           </button>
         ))}
       </nav>
@@ -46,7 +50,9 @@ export function Inspector({ tab, onTab }: { tab: InspectorTab; onTab(tab: Inspec
           </div>
         ) : null}
         {tab === 'selection' ? (
-          <SelectionPanel />
+          <SelectionPanel onTab={onTab} />
+        ) : tab === 'poses' ? (
+          <PosesPanel />
         ) : tab === 'show' ? (
           <ShowPanel />
         ) : tab === 'servos' ? (
@@ -63,8 +69,10 @@ export function Inspector({ tab, onTab }: { tab: InspectorTab; onTab(tab: Inspec
 // Channel and keys
 // ---------------------------------------------------------------------------
 
-function SelectionPanel() {
+function SelectionPanel({ onTab }: { onTab(tab: InspectorTab): void }) {
   const channel = useSelectedChannel()
+  const cueId = useShow((s) => s.selection.cueId)
+  if (cueId) return <CueSection cueId={cueId} onTab={onTab} />
   if (!channel) return <p className="ht-hint">Select a channel on the timeline.</p>
   return (
     <>
@@ -139,6 +147,69 @@ function KeysSection({ channel }: { channel: Channel }) {
           </div>
         </>
       )}
+    </Section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Cue
+// ---------------------------------------------------------------------------
+
+function CueSection({ cueId, onTab }: { cueId: string; onTab(tab: InspectorTab): void }) {
+  const cue = useShow((s) => s.show.cues.find((c) => c.id === cueId))
+  const copies = useShow((s) => s.show.poses)
+  const library = usePoses((s) => s.poses)
+  const update = useShow((s) => s.updateCue)
+  if (!cue) return null
+  // The library, plus the show's own copy of a pose the library has lost.
+  const choices = [...library, ...copies.filter((p) => !library.some((l) => l.id === p.id))]
+  const known = choices.some((p) => p.id === cue.poseId)
+
+  return (
+    <Section title="Cue">
+      <Field label="Pose">
+        <select className="ht-select" value={cue.poseId} onChange={(e) => update(cue.id, { poseId: e.target.value })}>
+          {known ? null : <option value={cue.poseId}>Missing pose</option>}
+          {choices.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name || 'Untitled pose'}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Time">
+        <TimeInput ms={cue.t} onChange={(t) => update(cue.id, { t })} />
+      </Field>
+      <Field label="Hold" hint="How long the figure stays in the pose before moving on toward the next key">
+        <NumberField value={cue.holdMs / 1000} min={0} step={0.1} suffix="s" onChange={(v) => update(cue.id, { holdMs: v * 1000 }, 'hold')} />
+      </Field>
+      <Field label="Into next" hint="How the curve leaves the pose toward the next key">
+        <select className="ht-select" value={cue.ease} onChange={(e) => update(cue.id, { ease: e.target.value as Ease })}>
+          {EASES.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <p className="ht-hint">The figure moves into the pose from wherever the keys before it leave each servo.</p>
+      <div className="ht-row">
+        <button
+          type="button"
+          className="ht-btn ht-btn--sm ht-btn--secondary"
+          disabled={!library.some((p) => p.id === cue.poseId)}
+          onClick={() => {
+            usePoses.getState().edit(cue.poseId)
+            onTab('poses')
+          }}
+        >
+          Edit pose
+        </button>
+        <span className="ht-spacer" />
+        <button type="button" className="ht-btn ht-btn--sm ht-btn--danger" onClick={() => useShow.getState().removeCues([cue.id])}>
+          Delete cue
+        </button>
+      </div>
     </Section>
   )
 }
