@@ -36,6 +36,10 @@ function ConnectionSection() {
           aria-label="Serial port"
           value={selectedPort ?? ''}
           disabled={open || busy}
+          // Looks again as the pointer arrives, for an adapter plugged in
+          // since, so the list is current before it opens rather than
+          // changing under it.
+          onPointerEnter={() => void c.refreshPorts()}
           onChange={(e) => c.selectPort(e.target.value)}
         >
           {ports.length === 0 ? <option value="">{c.canRequestPort() ? 'Click Add port' : 'No ports found'}</option> : null}
