@@ -70,6 +70,7 @@ export class ServoOutput {
   private lastTickAt = 0
   private completions: number[] = []
   private stats_: OutputStats = { achievedHz: 0, dropped: 0, writes: 0 }
+  private silent_: string[] = []
 
   constructor(
     private readonly bus: OutputBus,
@@ -85,6 +86,14 @@ export class ServoOutput {
 
   get stats(): OutputStats {
     return this.stats_
+  }
+
+  /**
+   * Names of the channels whose servo did not answer the position read on
+   * arming. Usually a channel pointed at an address nothing is on.
+   */
+  get silent(): readonly string[] {
+    return this.silent_
   }
 
   /** Where each channel was last told to go, in degrees at the servo. */
@@ -103,14 +112,17 @@ export class ServoOutput {
     this.lastDegrees.clear()
     this.lastSent.clear()
     this.stats_ = { achievedHz: 0, dropped: 0, writes: 0 }
+    const silent: string[] = []
     await this.bus.run(async () => {
       for (const channel of show.channels) {
         const target = channelTarget(show, channel)
         await this.bus.ensureSpeed(target.speedCode)
         const counts = await this.bus.tryRead(target, REG.POSITION, { tries: 3 })
         if (counts != null) this.lastDegrees.set(channel.id, positionDegrees(counts & POSITION_MASK))
+        else silent.push(channel.name)
       }
     })
+    this.silent_ = silent
     this.lastTickAt = this.wallClock()
     this.timer = setInterval(() => this.tick(), 1000 / show.outputHz)
   }

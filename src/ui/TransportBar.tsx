@@ -23,6 +23,7 @@ function OutputControl() {
   const arming = useTransport((s) => s.arming)
   const stats = useTransport((s) => s.stats)
   const error = useTransport((s) => s.outputError)
+  const silent = useTransport((s) => s.silent)
   const outputHz = useShow((s) => s.show.outputHz)
 
   return (
@@ -37,6 +38,14 @@ function OutputControl() {
           title="Updates that reached the bus in the last second, against the show's output rate. Dropped: ticks skipped because the bus was still busy."
         >
           {stats.achievedHz} / {outputHz} Hz · {stats.dropped} dropped
+        </span>
+      ) : null}
+      {armed && !error && silent.length > 0 ? (
+        <span
+          className="ht-tag ht-tag--warn"
+          title="These channels' servos did not answer when the output was armed, so the show is probably being sent to an address nothing is on. Point each one at a scanned servo in the Servos panel."
+        >
+          No reply: {silent.join(', ')}
         </span>
       ) : null}
       <button
