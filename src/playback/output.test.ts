@@ -59,6 +59,17 @@ describe('ServoOutput', () => {
     expect(writes.at(-1)!.value).toBe(degreesToPosition(10))
   })
 
+  it('names the channels whose servo did not answer on arming', async () => {
+    const show = showWith([0, 0])
+    show.channels.push({ ...newChannel(1), name: 'Jaw' })
+    const { bus } = fakeBus(null)
+    vi.mocked(bus.tryRead).mockResolvedValueOnce(degreesToPosition(0))
+    const out = new ServoOutput(bus, () => show, () => 0)
+    await out.arm()
+    out.disarm()
+    expect(out.silent).toEqual(['Jaw'])
+  })
+
   it('does not resend an unchanged position until the resend interval', async () => {
     const show = showWith([0, 0])
     let wall = 0

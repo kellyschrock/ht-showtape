@@ -30,6 +30,8 @@ interface TransportState {
   arming: boolean
   outputError: string | null
   stats: OutputStats | null
+  /** Channels whose servo did not answer when the output was armed. */
+  silent: readonly string[]
 
   play(): void
   pause(): void
@@ -100,7 +102,7 @@ export const useTransport = create<TransportState>((set, get) => {
     output = null
     if (statsTimer) clearInterval(statsTimer)
     statsTimer = null
-    set({ armed: false, arming: false, stats: null, outputError: error })
+    set({ armed: false, arming: false, stats: null, silent: [], outputError: error })
   }
 
   // The adapter going away takes the output with it.
@@ -119,6 +121,7 @@ export const useTransport = create<TransportState>((set, get) => {
     arming: false,
     outputError: null,
     stats: null,
+    silent: [],
 
     play() {
       // Playing hands the figure back to the timeline.
@@ -182,7 +185,7 @@ export const useTransport = create<TransportState>((set, get) => {
         return
       }
       output = next
-      set({ armed: true, arming: false, stats: next.stats })
+      set({ armed: true, arming: false, stats: next.stats, silent: next.silent })
       statsTimer = setInterval(() => {
         if (output) set({ stats: output.stats })
       }, 250)
