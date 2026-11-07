@@ -24,6 +24,13 @@ export function TopBar({ onOpenServos }: { onOpenServos(): void }) {
 
   useEffect(() => {
     void refreshPorts()
+    // Nothing reports an adapter being plugged in, so look again whenever
+    // the window comes back, which is usually right after one was.
+    const onFocus = () => {
+      if (useConnection.getState().openedPort == null) void refreshPorts()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [refreshPorts])
 
   useEffect(() => {
