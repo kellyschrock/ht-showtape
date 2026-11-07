@@ -23,7 +23,7 @@ function shape(ease: Ease, u: number): number {
 export function sampleKeys(keys: readonly Keyframe[], t: number, rest: number): number {
   const first = keys[0]
   if (!first) return rest
-  if (t <= first.t) return first.v
+  if (t < first.t) return first.v
   // Binary search for the last key at or before t.
   let lo = 0
   let hi = keys.length - 1

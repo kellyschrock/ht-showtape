@@ -239,6 +239,7 @@
 
 .st-timeline__top {
   display: flex;
+  flex-direction: column;
   position: sticky;
   top: 0;
   z-index: 4;
@@ -255,6 +256,54 @@
   flex: none;
   background: var(--ht-surface-2);
   border-right: 1px solid var(--ht-line-strong);
+}
+
+.st-timeline__row {
+  display: flex;
+}
+.st-timeline__row--cues {
+  border-top: 1px solid var(--ht-line);
+}
+.st-corner--label {
+  color: var(--ht-ink-3);
+  font-size: var(--ht-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Poses placed on the timeline: a chip per cue, as long as its hold. */
+.st-cues {
+  position: relative;
+  flex: none;
+  height: 100%;
+}
+.st-cue {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--ht-space-2);
+  border-left: 2px solid var(--ht-gold);
+  border-radius: 0 var(--ht-radius-sm) var(--ht-radius-sm) 0;
+  background: color-mix(in srgb, var(--ht-gold) 22%, var(--ht-surface-2));
+  color: var(--ht-ink);
+  font-size: var(--ht-size-xs);
+  white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+}
+.st-cue:active {
+  cursor: grabbing;
+}
+.st-cue--on {
+  background: var(--ht-gold);
+  color: var(--ht-black);
+  box-shadow: 0 0 0 1px #fff;
+}
+.st-cue--missing {
+  border-left-color: var(--ht-bad);
+  background: color-mix(in srgb, var(--ht-bad) 22%, var(--ht-surface-2));
 }
 
 .st-ruler {
@@ -421,6 +470,24 @@
 }
 .st-key:hover .st-key__mark {
   fill: var(--ht-ink-3);
+}
+.st-track__value--held {
+  color: var(--ht-gold);
+}
+
+/* A key a pose's hold has set aside. */
+.st-key--aside {
+  opacity: 0.35;
+}
+
+/* A key put there by a pose: gold, and picking it picks the cue. */
+.st-key--pose {
+  cursor: pointer;
+}
+.st-key--pose .st-key__mark {
+  fill: var(--ht-gold);
+  stroke: var(--st-lane-bg);
+  stroke-width: 1.5;
 }
 .st-key--on .st-key__mark {
   fill: #fff;
@@ -707,4 +774,89 @@
 }
 .st-popout .st-monitor {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+/* --------------------------------------------------------------------------
+   Poses panel
+   -------------------------------------------------------------------------- */
+
+.st-poselist {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.st-poselist button {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-2);
+  width: 100%;
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.st-poselist button:hover {
+  background: var(--ht-surface-2);
+}
+.st-poselist button[aria-pressed='true'] {
+  border-color: var(--ht-gold);
+  background: color-mix(in srgb, var(--ht-gold) 14%, transparent);
+}
+.st-poselist__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-poselist__meta {
+  color: var(--ht-ink-3);
+  font-size: var(--ht-size-xs);
+}
+
+.st-posing {
+  border-color: var(--ht-gold);
+  background: var(--ht-gold);
+  color: var(--ht-black);
+}
+
+.st-joint {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--ht-space-2);
+  padding: var(--ht-space-1) 0;
+  border-bottom: 1px solid var(--ht-line);
+}
+.st-joint__name {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-width: 0;
+  font-size: var(--ht-size-sm);
+}
+.st-joint__swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.st-joint__controls {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+.st-joint__controls .ht-range {
+  flex: 1;
+  min-width: 0;
+}
+.st-joint--out .st-joint__name {
+  color: var(--ht-ink-3);
 }

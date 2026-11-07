@@ -13,6 +13,7 @@ import { FakeLink, FAKE_PORT_ID } from '../ht-servo/src/transport/fake-link'
 import type { Link } from '../ht-servo/src/transport/link'
 import { REPORT_OFF, raiseDtrAfterDetect } from '../ht-servo/src/protocol'
 import { parseShow } from '../src/show/model'
+import { resolveShow } from '../src/show/poses'
 import { Player } from '../src/player/player'
 import { NodeSerialLink } from './serial-link'
 
@@ -85,7 +86,8 @@ async function main(): Promise<number> {
   const gapMs = number(values.gap, '--gap', 0) * 1000
   const homeSpeed = number(values['home-speed'], '--home-speed', 30)
   if (homeSpeed === 0) throw new Error('--home-speed must be more than 0.')
-  const show = parseShow(JSON.parse(await readFile(file, 'utf8')))
+  // Poses placed on the timeline play from the copies the show file keeps.
+  const show = resolveShow(parseShow(JSON.parse(await readFile(file, 'utf8'))))
   log(`${show.name}: ${show.channels.length} channel${show.channels.length === 1 ? '' : 's'}, ${(show.source.durationMs / 1000).toFixed(1)} s`)
 
   const link: Link = values.simulator ? new FakeLink() : new NodeSerialLink()

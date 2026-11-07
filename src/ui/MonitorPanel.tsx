@@ -5,7 +5,7 @@ import { servoDegrees } from '../show/sample'
 import { ServoMonitor, type SimServo } from '../playback/monitor'
 import { useMonitor } from '../stores/monitor'
 import { useShow } from '../stores/show'
-import { showTime } from '../stores/transport'
+import { playbackShow, showTime } from '../stores/transport'
 import { useShortcuts } from './shortcuts'
 
 /**
@@ -36,7 +36,7 @@ function useSimServos(view: Window): SimServo[] {
     let prev = view.performance.now()
     let frame = 0
     const tick = (now: number) => {
-      const next = monitor.step(useShow.getState().show, showTime(), now - prev)
+      const next = monitor.step(playbackShow(), showTime(), now - prev)
       prev = now
       setServos((old) => (same(old, next) ? old : next))
       frame = view.requestAnimationFrame(tick)

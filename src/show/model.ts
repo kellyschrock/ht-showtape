@@ -75,6 +75,38 @@ export interface Channel {
   keys: Keyframe[]
 }
 
+/**
+ * A named shape of the figure: a position for each of some of its channels.
+ *
+ * Keyed by channel name, not channel id, so one pose works in every show
+ * for the same figure: each show's channels have their own ids, but the
+ * left elbow is called "Left elbow" in all of them. Channels a pose leaves
+ * out are left alone wherever it is placed.
+ */
+export interface Pose {
+  id: string
+  name: string
+  /** Degrees, by channel name, before each channel's invert and trim. */
+  values: Record<string, number>
+}
+
+/**
+ * A pose placed on the timeline. It refers to the pose rather than copying
+ * it, so changing the pose changes every cue that uses it. At its time it
+ * puts a key on each channel the pose names, the same as a key drawn by
+ * hand, so the figure moves into the pose from wherever it was.
+ */
+export interface Cue {
+  id: string
+  /** Milliseconds from the start of the show. */
+  t: number
+  poseId: string
+  /** How long the figure stays in the pose before moving on, in ms. */
+  holdMs: number
+  /** How the curve leaves the pose toward the next key. */
+  ease: Ease
+}
+
 export interface Show {
   format: typeof SHOW_FORMAT
   version: typeof SHOW_VERSION
@@ -89,6 +121,13 @@ export interface Show {
   /** How often playback sends positions, in hertz. */
   outputHz: number
   channels: Channel[]
+  cues: Cue[]
+  /**
+   * A copy of each pose the cues use, so a show file plays on its own,
+   * away from the library it was made with. The library's version wins
+   * in the editor; this copy is refreshed from it whenever it changes.
+   */
+  poses: Pose[]
 }
 
 export const CHANNEL_COLORS = ['#5b76d9', '#e0ba78', '#4ecb71', '#ff5c6b', '#b07be0', '#4fc3d9', '#e08a4f', '#c9d94f']
@@ -157,6 +196,8 @@ export function newShow(): Show {
     bus: { protocol: 'can20a', speedCode: 0 },
     outputHz: 50,
     channels: [newChannel(0)],
+    cues: [],
+    poses: [],
   }
 }
 
@@ -172,6 +213,10 @@ export function audibleChannels(show: Show): Channel[] {
 
 export function sortKeys(keys: Keyframe[]): Keyframe[] {
   return [...keys].sort((a, b) => a.t - b.t)
+}
+
+export function sortCues(cues: Cue[]): Cue[] {
+  return [...cues].sort((a, b) => a.t - b.t)
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +277,37 @@ export function parseShow(json: unknown): Show {
     },
     outputHz: Math.min(200, Math.max(1, num(o.outputHz, base.outputHz))),
     channels: channels.map((raw, i) => parseChannel(raw, i)),
+    cues: sortCues((Array.isArray(o.cues) ? o.cues : []).map(parseCue).filter((c): c is Cue => c != null)),
+    poses: parsePoses(o.poses),
   }
+}
+
+function parseCue(raw: unknown): Cue | null {
+  const c = (raw ?? {}) as Record<string, unknown>
+  if (typeof c.poseId !== 'string' || typeof c.t !== 'number' || !Number.isFinite(c.t)) return null
+  return {
+    id: typeof c.id === 'string' ? c.id : newId('q'),
+    t: Math.max(0, c.t),
+    poseId: c.poseId,
+    holdMs: Math.max(0, num(c.holdMs, 0)),
+    ease: pick(c.ease, EASES, 'smooth'),
+  }
+}
+
+/** Poses from parsed JSON, for a show's copies and for the library file alike. Bad entries are dropped. */
+export function parsePoses(json: unknown): Pose[] {
+  if (!Array.isArray(json)) return []
+  return json.flatMap((raw): Pose[] => {
+    const p = (raw ?? {}) as Record<string, unknown>
+    if (typeof p.id !== 'string') return []
+    const values: Record<string, number> = {}
+    if (typeof p.values === 'object' && p.values !== null) {
+      for (const [name, v] of Object.entries(p.values)) {
+        if (typeof v === 'number' && Number.isFinite(v)) values[name] = v
+      }
+    }
+    return [{ id: p.id, name: typeof p.name === 'string' ? p.name : 'Pose', values }]
+  })
 }
 
 function parseChannel(raw: unknown, index: number): Channel {

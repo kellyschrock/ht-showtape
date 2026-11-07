@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { getBus, onBusChange } from '@ht/stores/connection'
 import { InternalClock, type Clock } from '../clock/clock'
 import { ServoOutput, type OutputStats } from '../playback/output'
+import type { Pose, Show } from '../show/model'
+import { holdPose, resolveShow } from '../show/poses'
+import { heldPose, usePoses } from './poses'
 import { useShow } from './show'
 
 /**
@@ -49,6 +52,21 @@ const clock: Clock = new InternalClock()
 export function showTime(): number {
   return clock.now()
 }
+let held: { show: Show; pose: Pose; out: Show } | null = null
+
+/**
+ * The show as the servos get it: cues turned into keys, and while a pose is
+ * being shaped, the figure holding that pose. Output and the monitor both
+ * read this, so they always agree.
+ */
+export function playbackShow(): Show {
+  const show = resolveShow(useShow.getState().show)
+  const pose = heldPose()
+  if (!pose) return show
+  if (held?.show !== show || held.pose !== pose) held = { show, pose, out: holdPose(show, pose) }
+  return held.out
+}
+
 let output: ServoOutput | null = null
 let frame = 0
 let statsTimer: ReturnType<typeof setInterval> | null = null
@@ -103,6 +121,8 @@ export const useTransport = create<TransportState>((set, get) => {
     stats: null,
 
     play() {
+      // Playing hands the figure back to the timeline.
+      usePoses.getState().setPosing(false)
       if (clock.now() >= duration()) clock.seek(0)
       clock.play()
       set({ playing: true })
@@ -150,7 +170,7 @@ export const useTransport = create<TransportState>((set, get) => {
       set({ arming: true, outputError: null })
       const next = new ServoOutput(
         bus,
-        () => useShow.getState().show,
+        playbackShow,
         () => clock.now(),
         (error) => stopOutput(error instanceof Error ? error.message : String(error))
       )
