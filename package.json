@@ -21,6 +21,7 @@
   },
   "license": "ISC",
   "dependencies": {
+    "koffi": "3.3.2",
     "serialport": "^13.0.0"
   },
   "devDependencies": {

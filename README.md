@@ -131,13 +131,13 @@ or on Ctrl+C or `systemctl stop`, it eases them back to rest before letting
 go; a second Ctrl+C quits at once. Solo is ignored and mute is kept. If the
 adapter goes away it exits with an error, for systemd to restart it.
 
-On the Pi, Node 20 or later, the bundle and serialport are all it needs; the
+On the Pi, Node 20 or later, the bundle, serialport and koffi are all it needs; the
 rest of this repo and ht-servo are only for building it:
 
 ```bash
 mkdir -p /opt/showtape && cd /opt/showtape
 cp /path/to/showtape-play.cjs /path/to/show.showtape .
-npm install serialport@13
+npm install serialport@13 koffi@3.3.2
 ```
 
 `player/showtape-play.service` is a systemd unit to start it at boot.
