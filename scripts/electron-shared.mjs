@@ -12,8 +12,9 @@ export const shared = {
   sourcemap: true,
   logLevel: 'info',
   // Electron is supplied by the runtime. serialport carries a native
-  // binding, so it loads from this app's node_modules at run time.
-  external: ['electron', 'serialport'],
+  // binding, so it loads from this app's node_modules at run time. koffi,
+  // which ht-servo uses on Linux for the modem lines, is the same.
+  external: ['electron', 'serialport', 'koffi'],
 }
 
 export const entries = [

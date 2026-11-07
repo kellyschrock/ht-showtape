@@ -8,12 +8,16 @@
  */
 
 import { SerialPort } from 'serialport'
+import { setModemLines } from '../ht-servo/electron/modem-lines'
 import { LinkEmitter } from '../ht-servo/src/transport/link'
 import type { CloseOptions, Link, OpenOptions, PortInfo, Signals, Unsubscribe } from '../ht-servo/src/transport/link'
+
+const LINUX = process.platform === 'linux'
 
 /** USB bridges the adapters are built on, as ht-servo's port list sorts them. */
 const LIKELY_BRIDGES = [
   { vendorId: '10c4', productId: 'ea60' }, // Silicon Labs CP210x, seen on a DPC-CAN
+  { vendorId: '2e3c', productId: '5740' }, // Artery AT32 native USB, the USB DPC-20
   { vendorId: '0403', productId: '6001' }, // FTDI FT232
   { vendorId: '1a86', productId: '7523' }, // CH340
 ]
@@ -57,6 +61,16 @@ export class NodeSerialLink implements Link {
       })
       port.open((error) => {
         if (error) return reject(error)
+        if (LINUX) {
+          // Linux raises DTR and RTS at open whatever hupcl says, and RTS
+          // high silences the USB DPC-20. See ht-servo's modem-lines.ts.
+          try {
+            setModemLines(port, { rts: false })
+          } catch (lineError) {
+            port.close()
+            return reject(lineError instanceof Error ? lineError : new Error(String(lineError)))
+          }
+        }
         this.port = port
         this.portId = portId
         this.farewell = options.farewell?.length ? Buffer.from(options.farewell) : null
@@ -97,6 +111,15 @@ export class NodeSerialLink implements Link {
     if (!port) return Promise.reject(new Error('The port is not open.'))
     // An explicit pair, or set() raises whichever line was left out.
     const next = { dtr: signals.dtr ?? false, rts: signals.rts ?? false }
+    if (LINUX) {
+      // set() fails on CDC-ACM adapters there. See ht-servo's modem-lines.ts.
+      try {
+        setModemLines(port, next)
+        return Promise.resolve()
+      } catch (error) {
+        return Promise.reject(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
     return new Promise((resolve, reject) => port.set(next, (e) => (e ? reject(e) : resolve())))
   }
 
