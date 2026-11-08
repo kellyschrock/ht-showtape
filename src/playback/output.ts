@@ -1,4 +1,4 @@
-import { REG, degreesToPosition, positionDegrees, type Address } from '@ht/protocol'
+import { CMD, REG, degreesToPosition, positionDegrees, type Address } from '@ht/protocol'
 import type { Bus, Target } from '@ht/services/bus'
 import { audibleChannels, effectiveProtocol, type Channel, type Show } from '../show/model'
 import { sampleChannel, servoDegrees, slew } from '../show/sample'
@@ -15,12 +15,16 @@ import { sampleChannel, servoDegrees, slew } from '../show/sample'
  *
  * Nothing on the bus acknowledges a write, so an unchanged position is
  * still resent now and then, in case a frame was lost.
+ *
+ * A limp channel has its motor released so it can be moved by hand. It is
+ * sent nothing; its position is read instead, a few times a second.
  */
 
 /** The part of ht-servo's Bus this needs, so tests can stand in for it. */
 export type OutputBus = Pick<Bus, 'run' | 'ensureSpeed' | 'write' | 'tryRead'>
 
 const RESEND_MS = 500
+const LIMP_READ_MS = 100
 const POSITION_MASK = 16383
 
 export interface OutputStats {
@@ -71,6 +75,11 @@ export class ServoOutput {
   private completions: number[] = []
   private stats_: OutputStats = { achievedHz: 0, dropped: 0, writes: 0 }
   private silent_: string[] = []
+  private limp = new Set<string>()
+  private lastLimpRead = 0
+
+  /** Called with each limp channel's position as it is read, in degrees at the servo. */
+  onLimpPosition: ((channelId: string, degrees: number) => void) | null = null
 
   constructor(
     private readonly bus: OutputBus,
@@ -94,6 +103,11 @@ export class ServoOutput {
    */
   get silent(): readonly string[] {
     return this.silent_
+  }
+
+  /** The channels whose motor is released. */
+  get limpChannels(): ReadonlySet<string> {
+    return this.limp
   }
 
   /** Where each channel was last told to go, in degrees at the servo. */
@@ -132,6 +146,59 @@ export class ServoOutput {
     this.timer = null
   }
 
+  /** Releases a channel's motor so it can be moved by hand. */
+  async goLimp(channelId: string): Promise<void> {
+    const show = this.getShow()
+    const channel = show.channels.find((c) => c.id === channelId)
+    if (!channel || this.limp.has(channelId)) return
+    const target = channelTarget(show, channel)
+    // Marked first, so no tick sends it a position after the release.
+    this.limp.add(channelId)
+    try {
+      await this.bus.run(async () => {
+        await this.bus.ensureSpeed(target.speedCode)
+        await this.bus.write(target as Address, REG.POWER_CONTROL, CMD.POWER_FREE)
+      })
+    } catch (error) {
+      this.limp.delete(channelId)
+      throw error
+    }
+  }
+
+  /**
+   * Turns a limp channel's motor back on where it now is. Its target is set
+   * to that position first, or it would spring back to the last one it was
+   * sent.
+   */
+  async engage(channelId: string): Promise<void> {
+    if (!this.limp.has(channelId)) return
+    const show = this.getShow()
+    const channel = show.channels.find((c) => c.id === channelId)
+    if (!channel) {
+      this.limp.delete(channelId)
+      return
+    }
+    const target = channelTarget(show, channel)
+    await this.bus.run(async () => {
+      await this.bus.ensureSpeed(target.speedCode)
+      const counts = await this.bus.tryRead(target, REG.POSITION, { tries: 3 })
+      if (counts != null) this.lastDegrees.set(channelId, positionDegrees(counts & POSITION_MASK))
+      const held = this.lastDegrees.get(channelId)
+      if (held != null) {
+        const heldCounts = degreesToPosition(held)
+        await this.bus.write(target as Address, REG.POS_NEW, heldCounts)
+        this.lastSent.set(channelId, { counts: heldCounts, at: this.wallClock() })
+      }
+      await this.bus.write(target as Address, REG.POWER_CONTROL, CMD.POWER_ON)
+    })
+    this.limp.delete(channelId)
+  }
+
+  /** Engages every limp channel. */
+  async engageAll(): Promise<void> {
+    for (const id of [...this.limp]) await this.engage(id)
+  }
+
   /** Public for tests; the interval calls it. */
   tick(): void {
     const at = this.wallClock()
@@ -141,14 +208,17 @@ export class ServoOutput {
     }
     const dtMs = at - this.lastTickAt
     this.lastTickAt = at
-    const writes = plan(this.getShow(), this.getTime(), this.lastDegrees, dtMs)
+    const show = this.getShow()
+    const writes = plan(show, this.getTime(), this.lastDegrees, dtMs).filter((w) => !this.limp.has(w.channelId))
     for (const w of writes) this.lastDegrees.set(w.channelId, w.degrees)
 
     const due = writes.filter((w) => {
       const sent = this.lastSent.get(w.channelId)
       return !sent || sent.counts !== w.counts || at - sent.at >= RESEND_MS
     })
-    if (due.length === 0) return this.completed(at)
+    const readLimp = this.limp.size > 0 && at - this.lastLimpRead >= LIMP_READ_MS
+    if (due.length === 0 && !readLimp) return this.completed(at)
+    if (readLimp) this.lastLimpRead = at
 
     this.busy = true
     void this.bus
@@ -158,6 +228,7 @@ export class ServoOutput {
           await this.bus.write(w.target as Address, REG.POS_NEW, w.counts)
           this.lastSent.set(w.channelId, { counts: w.counts, at })
         }
+        if (readLimp) await this.readLimp(show)
       })
       .then(
         () => {
@@ -172,6 +243,20 @@ export class ServoOutput {
       .finally(() => {
         this.busy = false
       })
+  }
+
+  private async readLimp(show: Show): Promise<void> {
+    for (const channel of show.channels) {
+      if (!this.limp.has(channel.id)) continue
+      const target = channelTarget(show, channel)
+      await this.bus.ensureSpeed(target.speedCode)
+      const counts = await this.bus.tryRead(target, REG.POSITION, { tries: 1 })
+      // Engaged while this read was waiting: the engage has the last word.
+      if (counts == null || !this.limp.has(channel.id)) continue
+      const degrees = positionDegrees(counts & POSITION_MASK)
+      this.lastDegrees.set(channel.id, degrees)
+      this.onLimpPosition?.(channel.id, degrees)
+    }
   }
 
   private completed(at: number): void {

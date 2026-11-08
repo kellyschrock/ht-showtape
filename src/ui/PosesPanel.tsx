@@ -13,6 +13,9 @@ import { Field, NumberField, Section } from './fields'
  * Holding a pose sends it to the figure in place of the timeline, so each
  * slider moves its servo, inside its limits and no faster than its max
  * speed. Leaving the panel, or pressing play, hands the figure back.
+ *
+ * A held servo can also be made limp and posed by hand, with its slider
+ * following it.
  */
 
 /** Each channel's value at the playhead, poses included, by the name a pose knows it by. */
@@ -189,6 +192,10 @@ function Joint({ pose, channel }: { pose: Pose; channel: Channel }) {
   const name = poseName(channel)
   const v = pose.values[name]
   const included = v != null
+  const posing = usePoses((s) => s.posing)
+  const armed = useTransport((s) => s.armed)
+  const live = posing && armed
+  const limp = useTransport((s) => s.limp.includes(channel.id))
   const set = (next: number) => usePoses.getState().setValue(pose.id, name, roundDegrees(next))
 
   return (
@@ -212,11 +219,24 @@ function Joint({ pose, channel }: { pose: Pose; channel: Channel }) {
             max={channel.max}
             step={0.5}
             value={v}
+            disabled={limp}
             onChange={(e) => set(Number(e.target.value))}
           />
           <NumberField value={v} min={channel.min} max={channel.max} step={0.5} suffix="°" onChange={set} />
+          {live ? (
+            <button
+              type="button"
+              className={`ht-btn ht-btn--sm ${limp ? 'ht-btn--secondary' : 'ht-btn--ghost'}`}
+              aria-pressed={limp}
+              title={limp ? 'Turn the motor back on, holding where it is now' : 'Release the motor to move this servo by hand. The pose follows it.'}
+              onClick={() => void (limp ? useTransport.getState().engage(channel.id) : useTransport.getState().goLimp(channel.id))}
+            >
+              {limp ? 'Limp' : 'Go limp'}
+            </button>
+          ) : null}
         </div>
       ) : null}
+      {limp ? <p className="ht-hint">Move it by hand. Click Limp to hold it there.</p> : null}
     </div>
   )
 }
