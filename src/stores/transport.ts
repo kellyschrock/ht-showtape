@@ -3,7 +3,8 @@ import { getBus, onBusChange } from '@ht/stores/connection'
 import { InternalClock, type Clock } from '../clock/clock'
 import { ServoOutput, type OutputStats } from '../playback/output'
 import type { Pose, Show } from '../show/model'
-import { holdPose, resolveShow } from '../show/poses'
+import { holdPose, poseName, resolveShow } from '../show/poses'
+import { channelDegrees, roundDegrees } from '../show/sample'
 import { heldPose, usePoses } from './poses'
 import { useShow } from './show'
 
@@ -16,6 +17,10 @@ import { useShow } from './show'
  *
  * Output keeps running while paused, so scrubbing or nudging a key moves
  * the servos too. That is how a show gets built against the real figure.
+ *
+ * While a pose is held, a servo can be made limp and moved by hand; the
+ * pose follows it. Anything that ends the hold engages it again where it
+ * was left, so no servo stays limp unnoticed.
  */
 
 interface TransportState {
@@ -32,6 +37,8 @@ interface TransportState {
   stats: OutputStats | null
   /** Channels whose servo did not answer when the output was armed. */
   silent: readonly string[]
+  /** Channel ids whose motor is released for moving by hand. */
+  limp: readonly string[]
 
   play(): void
   pause(): void
@@ -43,6 +50,8 @@ interface TransportState {
   setSnap(snap: boolean): void
   arm(): Promise<void>
   disarm(): void
+  goLimp(channelId: string): Promise<void>
+  engage(channelId: string): Promise<void>
 }
 
 export const MIN_ZOOM = 10
@@ -102,8 +111,34 @@ export const useTransport = create<TransportState>((set, get) => {
     output = null
     if (statsTimer) clearInterval(statsTimer)
     statsTimer = null
-    set({ armed: false, arming: false, stats: null, silent: [], outputError: error })
+    set({ armed: false, arming: false, stats: null, silent: [], limp: [], outputError: error })
   }
+
+  function syncLimp(): void {
+    set({ limp: output ? [...output.limpChannels] : [] })
+  }
+
+  /** A limp servo moved by hand moves the held pose with it. */
+  function followHand(channelId: string, degrees: number): void {
+    const pose = heldPose()
+    const channel = playbackShow().channels.find((c) => c.id === channelId)
+    if (!pose || !channel || pose.values[poseName(channel)] == null) return
+    usePoses.getState().setValue(pose.id, poseName(channel), roundDegrees(channelDegrees(channel, degrees)))
+  }
+
+  function engageAll(): Promise<void> {
+    const current = output
+    if (!current || current.limpChannels.size === 0) return Promise.resolve()
+    return current.engageAll().then(syncLimp, (error: unknown) => {
+      syncLimp()
+      set({ outputError: error instanceof Error ? error.message : String(error) })
+    })
+  }
+
+  // Ending the hold, or holding a different pose, engages every limp servo.
+  usePoses.subscribe((now, before) => {
+    if (!now.posing || now.editingId !== before.editingId) void engageAll()
+  })
 
   // The adapter going away takes the output with it.
   onBusChange((bus) => {
@@ -122,6 +157,7 @@ export const useTransport = create<TransportState>((set, get) => {
     outputError: null,
     stats: null,
     silent: [],
+    limp: [],
 
     play() {
       // Playing hands the figure back to the timeline.
@@ -184,6 +220,7 @@ export const useTransport = create<TransportState>((set, get) => {
         set({ arming: false, outputError: error instanceof Error ? error.message : String(error) })
         return
       }
+      next.onLimpPosition = followHand
       output = next
       set({ armed: true, arming: false, stats: next.stats, silent: next.silent })
       statsTimer = setInterval(() => {
@@ -192,7 +229,28 @@ export const useTransport = create<TransportState>((set, get) => {
     },
 
     disarm() {
-      stopOutput()
+      // Limp servos are engaged where they are before the output lets go.
+      void engageAll().then(() => stopOutput())
+    },
+
+    async goLimp(channelId) {
+      if (!output || !heldPose()) return
+      try {
+        await output.goLimp(channelId)
+      } catch (error) {
+        set({ outputError: error instanceof Error ? error.message : String(error) })
+      }
+      syncLimp()
+    },
+
+    async engage(channelId) {
+      if (!output) return
+      try {
+        await output.engage(channelId)
+      } catch (error) {
+        set({ outputError: error instanceof Error ? error.message : String(error) })
+      }
+      syncLimp()
     },
   }
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { degreesToPosition } from '@ht/protocol'
+import { CMD, REG, degreesToPosition } from '@ht/protocol'
 import { newChannel, newShow } from '../show/model'
 import { plan, ServoOutput, type OutputBus } from './output'
 
@@ -85,5 +85,61 @@ describe('ServoOutput', () => {
     out.tick()
     await settle()
     expect(writes).toHaveLength(2)
+  })
+
+  describe('limp', () => {
+    async function armedLimp(position: number) {
+      const show = showWith([0, 20])
+      const id = show.channels[0]!.id
+      let wall = 0
+      const { bus, writes } = fakeBus(position)
+      const out = new ServoOutput(bus, () => show, () => 0, undefined, () => wall)
+      await out.arm()
+      out.disarm()
+      await out.goLimp(id)
+      return { show, id, out, writes, bus, advance: (ms: number) => (wall += ms) }
+    }
+
+    it('releases the motor and sends no positions while limp', async () => {
+      const { out, writes, advance } = await armedLimp(degreesToPosition(0))
+      expect(writes).toEqual([{ servoId: 1, addr: REG.POWER_CONTROL, value: CMD.POWER_FREE }])
+      advance(200)
+      out.tick()
+      await settle()
+      expect(writes.filter((w) => w.addr === REG.POS_NEW)).toHaveLength(0)
+    })
+
+    it('reports where the hand has moved it', async () => {
+      const { out, id, bus, advance } = await armedLimp(degreesToPosition(0))
+      const seen: Array<[string, number]> = []
+      out.onLimpPosition = (channelId, degrees) => seen.push([channelId, degrees])
+      vi.mocked(bus.tryRead).mockResolvedValue(degreesToPosition(33))
+      advance(200)
+      out.tick()
+      await settle()
+      expect(seen).toHaveLength(1)
+      expect(seen[0]![0]).toBe(id)
+      expect(seen[0]![1]).toBeCloseTo(33, 0)
+    })
+
+    it('engages where it was left: the target first, then the motor', async () => {
+      const { out, id, bus, writes } = await armedLimp(degreesToPosition(0))
+      vi.mocked(bus.tryRead).mockResolvedValue(degreesToPosition(-15))
+      await out.engage(id)
+      expect(writes.slice(-2)).toEqual([
+        { servoId: 1, addr: REG.POS_NEW, value: degreesToPosition(-15) },
+        { servoId: 1, addr: REG.POWER_CONTROL, value: CMD.POWER_ON },
+      ])
+      expect(out.limpChannels.size).toBe(0)
+    })
+
+    it('is not left marked limp when the release fails', async () => {
+      const show = showWith([0, 0])
+      const { bus } = fakeBus(null)
+      vi.mocked(bus.write).mockRejectedValueOnce(new Error('gone'))
+      const out = new ServoOutput(bus, () => show, () => 0)
+      await expect(out.goLimp(show.channels[0]!.id)).rejects.toThrow('gone')
+      expect(out.limpChannels.size).toBe(0)
+    })
   })
 })

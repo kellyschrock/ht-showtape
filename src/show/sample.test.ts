@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clamp, followChannel, sampleChannel, sampleKeys, segmentSpeed, servoDegrees, slew, tooFastSegments } from './sample'
+import { channelDegrees, clamp, followChannel, sampleChannel, sampleKeys, segmentSpeed, servoDegrees, slew, tooFastSegments } from './sample'
 import { newChannel, type Keyframe } from './model'
 
 const k = (t: number, v: number, ease: Keyframe['ease'] = 'linear'): Keyframe => ({ id: `${t}`, t, v, ease })
@@ -52,6 +52,12 @@ describe('limits', () => {
   it('applies invert after the limits, then trim', () => {
     const c = { ...newChannel(0), min: -30, max: 30, invert: true, trim: 5 }
     expect(servoDegrees(c, 90)).toBe(-25)
+  })
+
+  it('undoes trim and invert for a position read from the servo, then limits it', () => {
+    const c = { ...newChannel(0), min: -30, max: 30, invert: true, trim: 5 }
+    expect(channelDegrees(c, servoDegrees(c, 12))).toBe(12)
+    expect(channelDegrees(c, -60)).toBe(30)
   })
 
   it('slews no faster than the speed limit', () => {

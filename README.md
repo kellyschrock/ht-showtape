@@ -82,6 +82,10 @@ figure can use them.
 - **Hold this pose** sends the pose to the figure instead of the timeline,
   so each slider moves its servo, within its limits and max speed. Leaving
   the tab, or pressing play, hands the figure back to the timeline.
+- **Go limp**, beside each slider while a pose is held and the servos are
+  live, releases that servo's motor so it can be posed by hand. Its slider
+  follows it. Click **Limp** to hold it where it is; ending the hold,
+  opening another pose or turning the servos off does the same.
 - **Place at playhead**, or double-click the Poses lane under the ruler,
   puts the open pose on the timeline as a cue. Drag a cue to move it, or
   select it to set a **Hold**, how long the figure stays in the pose. The

@@ -60,6 +60,12 @@ export function servoDegrees(channel: Channel, v: number): number {
   return (channel.invert ? -limited : limited) + channel.trim
 }
 
+/** The channel value for degrees at the servo: servoDegrees undone, then limited. */
+export function channelDegrees(channel: Channel, servo: number): number {
+  const untrimmed = servo - channel.trim
+  return clamp(channel.invert ? -untrimmed : untrimmed, channel.min, channel.max)
+}
+
 /**
  * Moves `from` toward `to` by no more than `maxSpeed` deg/s over `dtMs`.
  * This is what stands between a seek or a badly drawn key and a mechanism
